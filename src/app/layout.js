@@ -12,8 +12,8 @@ import { ThemeProvider } from "../../context/ThemeContext";
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'CORE HR EMS Portal',
-  description: 'CORE HR Employee Management System',
+  title: 'NXTKYC ',
+  description: 'NXTKYC - KYC Verification System',
   icons: {
     icon: '/assets/logo-only.png',
     shortcut: '/assets/logo-only.png',
