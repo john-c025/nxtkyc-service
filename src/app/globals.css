@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+}
+
+/* Add this at the top of your globals.css */
+html.loading {
+  visibility: hidden;
+}
+
+/* Optional: You can also add a smooth transition when styles load */
+html {
+  visibility: visible;
+  transition: visibility 0.1s;
+}
+
+/* Add these styles to ensure proper scaling */
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+/* Ensure all elements scale properly */
+* {
+  box-sizing: border-box;
+}
+
+/* Make sure images and media scale properly */
+img, video, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Ensure text remains readable at different zoom levels */
+@media screen and (max-width: 768px) {
+  html {
+    font-size: 16px; /* Prevent text from becoming too small on mobile */
+  }
+}
