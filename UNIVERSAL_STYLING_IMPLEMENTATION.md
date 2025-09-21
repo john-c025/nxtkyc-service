@@ -172,7 +172,7 @@ import {
 ### 🎨 **Design Consistency**
 - **Unified Theme**: All components follow same design system
 - **Perfect Dark Mode**: Automatic theme switching
-- **Brand Colors**: Orange (#ff840b) consistently applied
+- **Brand Colors**: Pastel Yellow (#f59e0b) consistently applied to match NXTKYC logo
 - **Spacing & Typography**: Standardized across all components
 
 ### 🚀 **Performance**

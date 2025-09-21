@@ -40,58 +40,69 @@ export default function ClientKYCPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState([]);
   const [formData, setFormData] = useState({
-    // Personal Information (matching client_accounts table)
+    // Personal Information (matching client_accounts table exactly)
     fname: '',
     mname: '',
     sname: '',
     email: '',
     mobileno: '',
+    
+    // Additional personal info (stored in account_metadata as JSON)
     dateOfBirth: '',
     nationality: '',
     
-    // Address Information
+    // Address Information (stored in account_metadata as JSON)
     address: '',
     city: '',
     state: '',
     postalCode: '',
     country: '',
     
-    // Identity Documents
+    // Identity Documents (stored in account_metadata as JSON)
     identityType: '',
     identityNumber: '',
     identityExpiry: '',
     identityDocument: null,
     
-    // Address Verification
+    // Address Verification (stored in account_metadata as JSON)
     addressDocument: null,
     addressDocumentType: '',
     
-    // Financial Information
+    // Financial Information (stored in account_metadata as JSON)
     occupation: '',
     employer: '',
     annualIncome: '',
     sourceOfFunds: '',
     bankStatement: null,
     
-    // Additional Information
+    // Compliance Information (stored in account_metadata as JSON)
     pepStatus: false,
     pepDetails: '',
     sanctionsCheck: false,
     riskAssessment: '',
     
-    // Terms and Conditions
+    // Terms and Conditions (stored in account_metadata as JSON)
     termsAccepted: false,
     privacyAccepted: false,
     marketingAccepted: false,
     
-    // KYC Request specific fields
+    // KYC Request specific fields (matching kyc_requests table exactly)
     request_type: 'initial_verification',
-    priority_level: 2, // Medium priority
+    priority_level: 2, // Medium priority (2 = Medium)
     request_description: '',
     current_level: 0,
     level_to_upgrade_to: 1,
     has_files: false,
-    is_one_time_only: true
+    is_one_time_only: true,
+    
+    // Company and account fields
+    company_id: 1, // Will be set based on context
+    account_code: '', // Will be generated
+    account_origin_number: '', // Will be generated
+    account_id: '', // Will be generated
+    account_status: 1, // Default active
+    current_privilege_level: 0, // Default level 0
+    is_active: true // Default active
   });
   
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
@@ -209,45 +220,19 @@ export default function ClientKYCPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Prepare data for API submission matching database schema
-      const kycRequestData = {
-        // Generate unique KYC request ID
-        kyc_request_id: `KYC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-        company_id: 1, // This would come from context or URL params
-        client_account_id: null, // Will be created during submission
-        token_id: null, // Will be generated
-        request_type: formData.request_type,
-        request_status: 1, // Pending
-        priority_level: formData.priority_level,
-        request_description: formData.request_description || 'KYC verification request submitted by client',
-        current_level: formData.current_level,
-        level_to_upgrade_to: formData.level_to_upgrade_to,
-        has_files: uploadedDocuments.length > 0,
-        is_one_time_only: formData.is_one_time_only,
-        submitted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_by: 'CLIENT', // This would come from auth context
-        updated_by: 'CLIENT',
-        
-        // Client account data
-        client_account: {
-          fname: formData.fname,
-          mname: formData.mname,
-          sname: formData.sname,
-          email: formData.email,
-          mobileno: formData.mobileno,
-          account_status: 1,
-          current_privilege_level: 0,
-          is_active: true
-        },
-        
-        // Additional form data
+      // Generate unique identifiers
+      const timestamp = Date.now();
+      const kycRequestId = `KYC-${new Date().getFullYear()}-${String(timestamp).slice(-6)}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const accountCode = `ACC-${timestamp}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      const accountOriginNumber = `ORIG-${timestamp}`;
+      const accountId = `CLIENT-${timestamp}`;
+      
+      // Prepare account metadata JSON (storing additional info in account_metadata field)
+      const accountMetadata = {
         personal_info: {
           dateOfBirth: formData.dateOfBirth,
           nationality: formData.nationality
         },
-        
         address_info: {
           address: formData.address,
           city: formData.city,
@@ -255,46 +240,96 @@ export default function ClientKYCPage() {
           postalCode: formData.postalCode,
           country: formData.country
         },
-        
         identity_info: {
           identityType: formData.identityType,
           identityNumber: formData.identityNumber,
           identityExpiry: formData.identityExpiry
         },
-        
         financial_info: {
           occupation: formData.occupation,
           employer: formData.employer,
           annualIncome: formData.annualIncome,
           sourceOfFunds: formData.sourceOfFunds
         },
-        
         compliance_info: {
           pepStatus: formData.pepStatus,
           pepDetails: formData.pepDetails,
           sanctionsCheck: formData.sanctionsCheck,
           riskAssessment: formData.riskAssessment
         },
+        terms_info: {
+          termsAccepted: formData.termsAccepted,
+          privacyAccepted: formData.privacyAccepted,
+          marketingAccepted: formData.marketingAccepted
+        }
+      };
+
+      // Prepare data for API submission matching database schema exactly
+      const submissionData = {
+        // Client Account Data (client_accounts table)
+        client_account: {
+          company_id: formData.company_id,
+          account_code: accountCode,
+          account_origin_number: accountOriginNumber,
+          account_id: accountId,
+          fname: formData.fname,
+          mname: formData.mname,
+          sname: formData.sname,
+          account_status: formData.account_status, // 1 = Active
+          current_privilege_level: formData.current_privilege_level, // 0 = Default
+          account_metadata: JSON.stringify(accountMetadata),
+          is_active: formData.is_active, // true = Active
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: 'CLIENT',
+          updated_by: 'CLIENT'
+        },
         
-        // File uploads
-        uploaded_files: uploadedDocuments.map(doc => ({
+        // KYC Request Data (kyc_requests table)
+        kyc_request: {
+          kyc_request_id: kycRequestId,
+          company_id: formData.company_id,
+          client_account_id: null, // Will be set after account creation
+          token_id: null, // Will be generated by system
+          request_type: formData.request_type,
+          request_status: 1, // 1 = Pending
+          priority_level: formData.priority_level, // 2 = Medium
+          request_description: formData.request_description || 'KYC verification request submitted by client',
+          current_level: formData.current_level, // 0 = Default
+          level_to_upgrade_to: formData.level_to_upgrade_to, // 1 = First upgrade
+          has_files: uploadedDocuments.length > 0,
+          is_one_time_only: formData.is_one_time_only, // true = One time only
+          submitted_at: new Date().toISOString(),
+          completed_at: null,
+          archived_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: 'CLIENT',
+          updated_by: 'CLIENT'
+        },
+        
+        // Media Files Data (kyc_media_files table)
+        media_files: uploadedDocuments.map(doc => ({
+          kyc_request_id: kycRequestId,
           file_name: doc.name,
           file_original_name: doc.name,
-          file_type: 1, // Document type enum
+          file_type: 1, // 1 = Document type (enum)
           file_extension: doc.name.split('.').pop(),
           file_size: doc.size,
-          file_path: '', // Will be set by server
-          file_url: '', // Will be set by server
+          file_path: '', // Will be set by server after upload
+          file_url: '', // Will be set by server after upload
           mime_type: doc.type,
-          file_category: 1, // Document category enum
+          file_category: 1, // 1 = Document category (enum)
           file_description: doc.field,
-          is_verified: false,
+          is_verified: false, // Default not verified
           uploaded_at: new Date().toISOString(),
-          uploaded_by: 'CLIENT'
+          uploaded_by: 'CLIENT',
+          verified_at: null,
+          verified_by: null
         }))
       };
       
-      console.log('Submitting KYC Request:', kycRequestData);
+      console.log('Submitting KYC Request with Database Schema Compliance:', submissionData);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -382,15 +417,28 @@ export default function ClientKYCPage() {
                 {/* Step 1: Personal Information */}
                 {currentStep === 1 && (
                   <FormSection>
-                    <InputGroup>
-                      <label>First Name *</label>
-                      <input
-                        type="text"
-                        value={formData.fname}
-                        onChange={(e) => handleInputChange('fname', e.target.value)}
-                        placeholder="Enter your first name"
-                      />
-                    </InputGroup>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <InputGroup>
+                        <label>First Name *</label>
+                        <input
+                          type="text"
+                          value={formData.fname}
+                          onChange={(e) => handleInputChange('fname', e.target.value)}
+                          placeholder="Enter your first name"
+                          required
+                        />
+                      </InputGroup>
+                      <InputGroup>
+                        <label>Last Name *</label>
+                        <input
+                          type="text"
+                          value={formData.sname}
+                          onChange={(e) => handleInputChange('sname', e.target.value)}
+                          placeholder="Enter your last name"
+                          required
+                        />
+                      </InputGroup>
+                    </div>
                     <InputGroup>
                       <label>Middle Name</label>
                       <input
@@ -400,59 +448,59 @@ export default function ClientKYCPage() {
                         placeholder="Enter your middle name (optional)"
                       />
                     </InputGroup>
-                    <InputGroup>
-                      <label>Last Name *</label>
-                      <input
-                        type="text"
-                        value={formData.sname}
-                        onChange={(e) => handleInputChange('sname', e.target.value)}
-                        placeholder="Enter your last name"
-                      />
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Email Address *</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        placeholder="Enter your email address"
-                      />
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Mobile Number *</label>
-                      <input
-                        type="tel"
-                        value={formData.mobileno}
-                        onChange={(e) => handleInputChange('mobileno', e.target.value)}
-                        placeholder="Enter your mobile number"
-                      />
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Date of Birth *</label>
-                      <input
-                        type="date"
-                        value={formData.dateOfBirth}
-                        onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                      />
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Nationality *</label>
-                      <select
-                        value={formData.nationality}
-                        onChange={(e) => handleInputChange('nationality', e.target.value)}
-                      >
-                        <option value="">Select your nationality</option>
-                        <option value="US">United States</option>
-                        <option value="CA">Canada</option>
-                        <option value="GB">United Kingdom</option>
-                        <option value="AU">Australia</option>
-                        <option value="DE">Germany</option>
-                        <option value="FR">France</option>
-                        <option value="JP">Japan</option>
-                        <option value="SG">Singapore</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </InputGroup>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <InputGroup>
+                        <label>Email Address *</label>
+                        <input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          placeholder="Enter your email address"
+                          required
+                        />
+                      </InputGroup>
+                      <InputGroup>
+                        <label>Mobile Number *</label>
+                        <input
+                          type="tel"
+                          value={formData.mobileno}
+                          onChange={(e) => handleInputChange('mobileno', e.target.value)}
+                          placeholder="Enter your mobile number"
+                          required
+                        />
+                      </InputGroup>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <InputGroup>
+                        <label>Date of Birth *</label>
+                        <input
+                          type="date"
+                          value={formData.dateOfBirth}
+                          onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                          required
+                        />
+                      </InputGroup>
+                      <InputGroup>
+                        <label>Nationality *</label>
+                        <select
+                          value={formData.nationality}
+                          onChange={(e) => handleInputChange('nationality', e.target.value)}
+                          required
+                        >
+                          <option value="">Select your nationality</option>
+                          <option value="US">United States</option>
+                          <option value="CA">Canada</option>
+                          <option value="GB">United Kingdom</option>
+                          <option value="AU">Australia</option>
+                          <option value="DE">Germany</option>
+                          <option value="FR">France</option>
+                          <option value="JP">Japan</option>
+                          <option value="SG">Singapore</option>
+                          <option value="PH">Philippines</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </InputGroup>
+                    </div>
                   </FormSection>
                 )}
 
@@ -763,14 +811,25 @@ export default function ClientKYCPage() {
                     {/* Personal Information Summary */}
                     <div style={{ marginBottom: '1.5rem' }}>
                       <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.75rem 0', color: '#0f172a' }}>
-                        Personal Information
+                        Personal Information (Database Fields)
                       </h4>
                       <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', fontSize: '0.875rem' }}>
-                        <p><strong>Name:</strong> {formData.fname} {formData.mname} {formData.sname}</p>
-                        <p><strong>Email:</strong> {formData.email}</p>
-                        <p><strong>Mobile:</strong> {formData.mobileno}</p>
-                        <p><strong>Date of Birth:</strong> {formData.dateOfBirth}</p>
-                        <p><strong>Nationality:</strong> {formData.nationality}</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <p><strong>First Name (fname):</strong> {formData.fname}</p>
+                            <p><strong>Middle Name (mname):</strong> {formData.mname || 'N/A'}</p>
+                            <p><strong>Last Name (sname):</strong> {formData.sname}</p>
+                            <p><strong>Email:</strong> {formData.email}</p>
+                            <p><strong>Mobile (mobileno):</strong> {formData.mobileno}</p>
+                          </div>
+                          <div>
+                            <p><strong>Date of Birth:</strong> {formData.dateOfBirth}</p>
+                            <p><strong>Nationality:</strong> {formData.nationality}</p>
+                            <p><strong>Account Status:</strong> {formData.account_status === 1 ? 'Active' : 'Inactive'}</p>
+                            <p><strong>Privilege Level:</strong> {formData.current_privilege_level}</p>
+                            <p><strong>Company ID:</strong> {formData.company_id}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -786,30 +845,57 @@ export default function ClientKYCPage() {
                       </div>
                     </div>
 
+                    {/* KYC Request Summary */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.75rem 0', color: '#0f172a' }}>
+                        KYC Request Details (Database Fields)
+                      </h4>
+                      <div style={{ background: '#f0f9ff', padding: '1rem', borderRadius: '8px', fontSize: '0.875rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <p><strong>Request Type:</strong> {formData.request_type}</p>
+                            <p><strong>Priority Level:</strong> {formData.priority_level} (Medium)</p>
+                            <p><strong>Current Level:</strong> {formData.current_level}</p>
+                            <p><strong>Upgrade To Level:</strong> {formData.level_to_upgrade_to}</p>
+                          </div>
+                          <div>
+                            <p><strong>Has Files:</strong> {uploadedDocuments.length > 0 ? 'Yes' : 'No'}</p>
+                            <p><strong>One Time Only:</strong> {formData.is_one_time_only ? 'Yes' : 'No'}</p>
+                            <p><strong>Request Status:</strong> Pending (1)</p>
+                            <p><strong>Files Count:</strong> {uploadedDocuments.length}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Documents Summary */}
                     <div style={{ marginBottom: '1.5rem' }}>
                       <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.75rem 0', color: '#0f172a' }}>
-                        Uploaded Documents
+                        Uploaded Documents (kyc_media_files)
                       </h4>
                       <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px' }}>
-                        {uploadedDocuments.map((doc) => (
-                          <DocumentPreview key={doc.id}>
-                            <div className="document-icon">
-                              📄
-                            </div>
-                            <div className="document-info">
-                              <h4>{doc.name}</h4>
-                              <p>{(doc.size / 1024 / 1024).toFixed(2)} MB</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => removeDocument(doc.id)}
-                            >
-                              Remove
-                            </Button>
-                          </DocumentPreview>
-                        ))}
+                        {uploadedDocuments.length > 0 ? (
+                          uploadedDocuments.map((doc) => (
+                            <DocumentPreview key={doc.id}>
+                              <div className="document-icon">
+                                📄
+                              </div>
+                              <div className="document-info">
+                                <h4>{doc.name}</h4>
+                                <p>{(doc.size / 1024 / 1024).toFixed(2)} MB • {doc.field}</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeDocument(doc.id)}
+                              >
+                                Remove
+                              </Button>
+                            </DocumentPreview>
+                          ))
+                        ) : (
+                          <p style={{ color: '#64748b', fontStyle: 'italic' }}>No documents uploaded</p>
+                        )}
                       </div>
                     </div>
 

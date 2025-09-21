@@ -39,9 +39,9 @@ export const ReportCard = styled.div`
   &:hover {
     transform: translateY(-5px) scale(1.02);
     box-shadow: ${props => props.isDarkMode 
-      ? '0 8px 25px rgba(253, 186, 116, 0.2)' 
-      : '0 8px 25px rgba(249, 115, 22, 0.2)'};
-    border-color: ${props => props.isDarkMode ? '#fdba74' : '#f97316'};
+      ? '0 8px 25px rgba(252, 211, 77, 0.2)' 
+      : '0 8px 25px rgba(245, 158, 11, 0.2)'};
+    border-color: ${props => props.isDarkMode ? '#fcd34d' : '#f59e0b'};
 
     &:before {
       opacity: 1;

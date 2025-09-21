@@ -19,16 +19,48 @@ import {
   TabList,
   TabButton,
   MobileMenuToggle,
-  CompanyFilterContainer
+  CompanyFilterContainer,
+  ActionButtonsContainer,
+  SettingsGrid,
+  PrivilegeCard,
+  PrivilegeList,
+  PrivilegeItem,
+  PrivilegeForm,
+  FilterSortContainer,
+  FilterGroup,
+  SortGroup,
+  FilterActions,
+  ViewFilesModal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  FileList,
+  FileItem,
+  FilePreview,
+  RightNavPane,
+  NavPaneHeader,
+  NavPaneContent,
+  NavMenuItem,
+  NavPaneToggle
 } from './KYCPageStyled';
 
 export default function KYCPage() {
   const [activeTab, setActiveTab] = useState('verification');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompany, setSelectedCompany] = useState('all');
+  const [selectedPriority, setSelectedPriority] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
   const [kycRequests, setKycRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [kycPrivileges, setKycPrivileges] = useState([]);
+  const [showPrivilegeForm, setShowPrivilegeForm] = useState(false);
+  const [showFilesModal, setShowFilesModal] = useState(false);
+  const [selectedRequestFiles, setSelectedRequestFiles] = useState(null);
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
+  const [isNavPaneOpen, setIsNavPaneOpen] = useState(false);
 
   // Mock data for KYC requests based on database schema
   const mockKycData = [
@@ -201,8 +233,76 @@ export default function KYCPage() {
     }
   ];
 
+  // Mock data for KYC privileges based on database schema
+  const mockKycPrivileges = [
+    {
+      autoid: 1,
+      company_id: 1,
+      privilege_level: 1,
+      privilege_name: 'Basic Verification',
+      privilege_description: 'Standard KYC verification with basic document requirements',
+      privileges_json: JSON.stringify({
+        documents_required: ['ID', 'Proof of Address'],
+        verification_time: '24 hours',
+        approval_authority: 'Level 1 Officer'
+      }),
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      created_by: 'ADMIN001',
+      updated_by: 'ADMIN001',
+      company: {
+        company_name: 'Acme Corporation',
+        company_type: 'Financial Services'
+      }
+    },
+    {
+      autoid: 2,
+      company_id: 1,
+      privilege_level: 2,
+      privilege_name: 'Enhanced Verification',
+      privilege_description: 'Advanced KYC with additional documentation and verification steps',
+      privileges_json: JSON.stringify({
+        documents_required: ['ID', 'Proof of Address', 'Bank Statement', 'Employment Letter'],
+        verification_time: '48 hours',
+        approval_authority: 'Level 2 Officer'
+      }),
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      created_by: 'ADMIN001',
+      updated_by: 'ADMIN001',
+      company: {
+        company_name: 'Acme Corporation',
+        company_type: 'Financial Services'
+      }
+    },
+    {
+      autoid: 3,
+      company_id: 2,
+      privilege_level: 1,
+      privilege_name: 'Tech Startup Basic',
+      privilege_description: 'Streamlined verification for tech startup clients',
+      privileges_json: JSON.stringify({
+        documents_required: ['ID', 'Business Registration'],
+        verification_time: '12 hours',
+        approval_authority: 'Level 1 Officer'
+      }),
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      created_by: 'ADMIN001',
+      updated_by: 'ADMIN001',
+      company: {
+        company_name: 'Tech Solutions Inc',
+        company_type: 'Technology'
+      }
+    }
+  ];
+
   useEffect(() => {
     setKycRequests(mockKycData);
+    setKycPrivileges(mockKycPrivileges);
   }, []);
 
   const getStatusColor = (status) => {
@@ -257,13 +357,36 @@ export default function KYCPage() {
     }
   };
 
-  const filteredRequests = kycRequests.filter(request => {
-    const clientName = `${request.client_account.fname} ${request.client_account.mname} ${request.client_account.sname}`;
-    const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.kyc_request_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.client_account.account_code.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredAndSortedRequests = kycRequests.filter(request => {
     const matchesCompany = selectedCompany === 'all' || request.company.company_id.toString() === selectedCompany;
-    return matchesSearch && matchesCompany;
+    const matchesPriority = selectedPriority === 'all' || request.priority_level.toString() === selectedPriority;
+    const matchesStatus = selectedStatus === 'all' || request.request_status.toString() === selectedStatus;
+    
+    return matchesCompany && matchesPriority && matchesStatus;
+  }).sort((a, b) => {
+    let compareValue = 0;
+    
+    switch (sortBy) {
+      case 'date':
+        compareValue = new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+        break;
+      case 'request_id':
+        compareValue = a.kyc_request_id.localeCompare(b.kyc_request_id);
+        break;
+      case 'company':
+        compareValue = a.company.company_name.localeCompare(b.company.company_name);
+        break;
+      case 'priority':
+        compareValue = a.priority_level - b.priority_level;
+        break;
+      case 'status':
+        compareValue = a.request_status - b.request_status;
+        break;
+      default:
+        compareValue = 0;
+    }
+    
+    return sortOrder === 'asc' ? compareValue : -compareValue;
   });
 
   const handleStatusUpdate = (requestId, newStatus) => {
@@ -304,6 +427,133 @@ export default function KYCPage() {
     company_name: request.company.company_name
   })))];
 
+  const handleResetFilters = () => {
+    setSelectedCompany('all');
+    setSelectedPriority('all');
+    setSelectedStatus('all');
+    setSortBy('date');
+    setSortOrder('desc');
+  };
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
+  // Mock file data for different requests
+  const mockFileData = {
+    'KYC-2024-001-ABC123': [
+      {
+        id: 1,
+        name: 'passport_scan.jpg',
+        type: 'image',
+        size: '2.4 MB',
+        url: '/api/placeholder/800/600',
+        extension: 'jpg'
+      },
+      {
+        id: 2,
+        name: 'proof_of_address.pdf',
+        type: 'pdf',
+        size: '1.2 MB',
+        url: '/api/files/proof_of_address.pdf',
+        extension: 'pdf'
+      },
+      {
+        id: 3,
+        name: 'bank_statement.docx',
+        type: 'docx',
+        size: '856 KB',
+        url: '/api/files/bank_statement.docx',
+        extension: 'docx'
+      }
+    ],
+    'KYC-2024-002-DEF456': [
+      {
+        id: 4,
+        name: 'identity_verification.png',
+        type: 'image',
+        size: '3.1 MB',
+        url: '/api/placeholder/600/800',
+        extension: 'png'
+      },
+      {
+        id: 5,
+        name: 'video_verification.mp4',
+        type: 'video',
+        size: '15.6 MB',
+        url: '/api/files/video_verification.mp4',
+        extension: 'mp4'
+      }
+    ],
+    'KYC-2024-003-GHI789': [
+      {
+        id: 6,
+        name: 'incomplete_doc.txt',
+        type: 'restricted',
+        size: '1 KB',
+        url: null,
+        extension: 'txt'
+      },
+      {
+        id: 7,
+        name: 'driver_license.jpg',
+        type: 'image',
+        size: '1.8 MB',
+        url: '/api/placeholder/700/500',
+        extension: 'jpg'
+      }
+    ]
+  };
+
+  const getFileIcon = (type) => {
+    switch (type) {
+      case 'image': return '🖼️';
+      case 'pdf': return '📄';
+      case 'docx': return '📝';
+      case 'video': return '🎥';
+      default: return '🚫';
+    }
+  };
+
+  const isFileSupported = (extension) => {
+    const supportedTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'docx', 'mp4', 'mov', 'avi'];
+    return supportedTypes.includes(extension.toLowerCase());
+  };
+
+  const canPreview = (type) => {
+    return ['image', 'pdf', 'video'].includes(type);
+  };
+
+  const handleViewFiles = (requestId) => {
+    const files = mockFileData[requestId] || [];
+    const supportedFiles = files.filter(file => isFileSupported(file.extension));
+    
+    setSelectedRequestFiles({
+      requestId,
+      files: supportedFiles
+    });
+    setSelectedFileIndex(0);
+    setShowFilesModal(true);
+  };
+
+  const handleFileDownload = (file) => {
+    if (file.type === 'docx' || file.type === 'video') {
+      // Simulate download
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleLogout = () => {
+    // Simulate logout
+    console.log('Logging out...');
+    // You would typically clear tokens and redirect here
+  };
+
   return (
     <DashboardContainer>
       <MainContent>
@@ -320,31 +570,7 @@ export default function KYCPage() {
             </HeaderTitle>
           </HeaderContent>
           <HeaderActions>
-            <SearchInputWrapper>
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <SearchInput
-                type="text"
-                placeholder="Search KYC requests..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </SearchInputWrapper>
-            <CompanyFilterContainer>
-              <label>Company:</label>
-              <select 
-                value={selectedCompany} 
-                onChange={(e) => setSelectedCompany(e.target.value)}
-              >
-                <option value="all">All Companies</option>
-                {companies.map(company => (
-                  <option key={company.company_id} value={company.company_id.toString()}>
-                    {company.company_name}
-                  </option>
-                ))}
-              </select>
-            </CompanyFilterContainer>
+            {/* Filters and Sort Controls */}
           </HeaderActions>
         </TopBar>
 
@@ -364,32 +590,106 @@ export default function KYCPage() {
                 Document Management
               </TabButton>
               <TabButton 
-                isActive={activeTab === 'compliance'} 
-                onClick={() => setActiveTab('compliance')}
-              >
-                Compliance Reports
-              </TabButton>
-              <TabButton 
                 isActive={activeTab === 'settings'} 
                 onClick={() => setActiveTab('settings')}
               >
-                KYC Settings
+                Privilege Settings
               </TabButton>
             </TabList>
           </TabContainer>
 
           {activeTab === 'verification' && (
-            <Card>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#0f172a' }}>
-                  KYC Verification Requests
-                </h2>
-                <p style={{ color: '#64748b', margin: 0 }}>
-                  Manage and review client verification requests
-                </p>
-              </div>
+            <>
+              <FilterSortContainer>
+                <FilterGroup>
+                  <label>Company</label>
+                  <select 
+                    value={selectedCompany} 
+                    onChange={(e) => setSelectedCompany(e.target.value)}
+                  >
+                    <option value="all">All Companies</option>
+                    {companies.map(company => (
+                      <option key={company.company_id} value={company.company_id.toString()}>
+                        {company.company_name}
+                      </option>
+                    ))}
+                  </select>
+                </FilterGroup>
 
-              <Table>
+                <FilterGroup>
+                  <label>Priority</label>
+                  <select 
+                    value={selectedPriority} 
+                    onChange={(e) => setSelectedPriority(e.target.value)}
+                  >
+                    <option value="all">All Priorities</option>
+                    <option value="1">Low</option>
+                    <option value="2">Medium</option>
+                    <option value="3">High</option>
+                    <option value="4">Urgent</option>
+                  </select>
+                </FilterGroup>
+
+                <FilterGroup>
+                  <label>Status</label>
+                  <select 
+                    value={selectedStatus} 
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="1">Pending</option>
+                    <option value="2">In Review</option>
+                    <option value="3">Approved</option>
+                    <option value="4">Rejected</option>
+                    <option value="5">Archived</option>
+                  </select>
+                </FilterGroup>
+
+                <SortGroup>
+                  <label>Sort By</label>
+                  <div className="sort-controls">
+                    <select 
+                      value={sortBy} 
+                      onChange={(e) => setSortBy(e.target.value)}
+                    >
+                      <option value="date">Date</option>
+                      <option value="request_id">Request ID</option>
+                      <option value="company">Company</option>
+                      <option value="priority">Priority</option>
+                      <option value="status">Status</option>
+                    </select>
+                    <button type="button" onClick={toggleSortOrder} title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}>
+                      {sortOrder === 'asc' ? (
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                        </svg>
+                      ) : (
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </SortGroup>
+
+                <FilterActions>
+                  <Button size="sm" variant="secondary" onClick={handleResetFilters}>
+                    Reset Filters
+                  </Button>
+                </FilterActions>
+              </FilterSortContainer>
+
+              <Card>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#0f172a' }}>
+                    KYC Verification Requests
+                  </h2>
+                  <p style={{ color: '#64748b', margin: 0 }}>
+                    Manage and review client verification requests ({filteredAndSortedRequests.length} results)
+                  </p>
+                </div>
+
+                <Table>
                 <table>
                   <thead>
                     <tr>
@@ -408,7 +708,7 @@ export default function KYCPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRequests.map((request) => (
+                    {filteredAndSortedRequests.map((request) => (
                       <tr key={request.autoid}>
                         <td>
                           <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>
@@ -476,15 +776,15 @@ export default function KYCPage() {
                             display: 'inline-flex', 
                             alignItems: 'center', 
                             justifyContent: 'center',
-                            width: '24px', 
+                            width: request.level_to_upgrade_to >= 4 ? '32px' : '24px', 
                             height: '24px', 
-                            borderRadius: '50%', 
-                            background: '#dbeafe', 
-                            color: '#2563eb',
+                            borderRadius: request.level_to_upgrade_to >= 4 ? '12px' : '50%', 
+                            background: request.level_to_upgrade_to >= 4 ? '#fcd34d' : '#dbeafe', 
+                            color: request.level_to_upgrade_to >= 4 ? '#92400e' : '#2563eb',
                             fontSize: '0.75rem',
                             fontWeight: '600'
                           }}>
-                            {request.level_to_upgrade_to}
+                            {request.level_to_upgrade_to >= 4 ? 'MAX' : request.level_to_upgrade_to}
                           </span>
                         </td>
                         <td>
@@ -499,27 +799,29 @@ export default function KYCPage() {
                         </td>
                         <td>{new Date(request.submitted_at).toLocaleDateString()}</td>
                         <td>
-                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <ActionButtonsContainer>
                             <Button 
                               size="sm" 
                               variant="primary"
-                              onClick={() => handleDocumentDownload(request.kyc_request_id, 'all')}
+                              onClick={() => handleViewFiles(request.kyc_request_id)}
                             >
                               View Files
                             </Button>
-                            {request.request_status === 1 && (
+                            {request.level_to_upgrade_to < 4 && (
                               <>
                                 <Button 
                                   size="sm" 
                                   variant="secondary"
                                   onClick={() => handleStatusUpdate(request.kyc_request_id, 2)}
+                                  disabled={request.request_status === 3 || request.request_status === 4 || request.request_status === 5}
                                 >
-                                  Start Review
+                                  Review
                                 </Button>
                                 <Button 
                                   size="sm" 
                                   variant="secondary"
                                   onClick={() => handleStatusUpdate(request.kyc_request_id, 3)}
+                                  disabled={request.request_status === 3 || request.request_status === 5}
                                 >
                                   Approve
                                 </Button>
@@ -527,24 +829,7 @@ export default function KYCPage() {
                                   size="sm" 
                                   variant="secondary"
                                   onClick={() => handleStatusUpdate(request.kyc_request_id, 4)}
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
-                            {request.request_status === 2 && (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary"
-                                  onClick={() => handleStatusUpdate(request.kyc_request_id, 3)}
-                                >
-                                  Approve
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary"
-                                  onClick={() => handleStatusUpdate(request.kyc_request_id, 4)}
+                                  disabled={request.request_status === 4 || request.request_status === 5}
                                 >
                                   Reject
                                 </Button>
@@ -554,17 +839,19 @@ export default function KYCPage() {
                               size="sm" 
                               variant="ghost"
                               onClick={() => handleArchiveRequest(request.kyc_request_id)}
+                              disabled={request.request_status === 5}
                             >
                               Archive
                             </Button>
-                          </div>
+                          </ActionButtonsContainer>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </Table>
-            </Card>
+                </Table>
+              </Card>
+            </>
           )}
 
           {activeTab === 'documents' && (
@@ -583,39 +870,315 @@ export default function KYCPage() {
             </Card>
           )}
 
-          {activeTab === 'compliance' && (
-            <Card>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#0f172a' }}>
-                  Compliance Reports
-                </h2>
-                <p style={{ color: '#64748b', margin: 0 }}>
-                  Generate and view compliance reports
-                </p>
-              </div>
-              <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
-                <p>Compliance reporting interface will be implemented here</p>
-              </div>
-            </Card>
-          )}
-
           {activeTab === 'settings' && (
             <Card>
               <div style={{ marginBottom: '1.5rem' }}>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#0f172a' }}>
-                  KYC Settings
+                  KYC Privilege Settings
                 </h2>
                 <p style={{ color: '#64748b', margin: 0 }}>
-                  Configure KYC verification settings and requirements
+                  Configure company-specific KYC privilege levels and verification requirements
                 </p>
+                <div style={{ marginTop: '1rem' }}>
+                  <Button 
+                    variant="primary" 
+                    onClick={() => setShowPrivilegeForm(!showPrivilegeForm)}
+                  >
+                    {showPrivilegeForm ? 'Cancel' : 'Add New Privilege'}
+                  </Button>
+                </div>
               </div>
-              <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
-                <p>KYC settings interface will be implemented here</p>
-              </div>
+
+              {showPrivilegeForm && (
+                <PrivilegeForm>
+                  <div className="form-header">
+                    <h3>Create New KYC Privilege</h3>
+                    <p>Define a new privilege level for a specific company</p>
+                  </div>
+                  
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Company</label>
+                      <select>
+                        <option value="">Select Company</option>
+                        {companies.map(company => (
+                          <option key={company.company_id} value={company.company_id}>
+                            {company.company_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Privilege Level</label>
+                      <select>
+                        <option value="">Select Level</option>
+                        <option value="1">Level 1 - Basic</option>
+                        <option value="2">Level 2 - Enhanced</option>
+                        <option value="3">Level 3 - Premium</option>
+                        <option value="4">Level 4 - Enterprise</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Privilege Name</label>
+                      <input type="text" placeholder="e.g., Enhanced Verification" />
+                    </div>
+                    <div className="form-group">
+                      <label>Status</label>
+                      <select>
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Description</label>
+                      <textarea placeholder="Describe the privilege requirements and scope..."></textarea>
+                    </div>
+                  </div>
+                  
+                  <div className="form-actions">
+                    <Button type="submit" variant="primary">Create Privilege</Button>
+                    <Button type="button" variant="secondary" onClick={() => setShowPrivilegeForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </PrivilegeForm>
+              )}
+
+              <SettingsGrid>
+                {companies.map(company => {
+                  const companyPrivileges = kycPrivileges.filter(p => p.company_id === company.company_id);
+                  
+                  return (
+                    <PrivilegeCard key={company.company_id}>
+                      <div className="company-header">
+                        <div>
+                          <h3>{company.company_name}</h3>
+                          <span className="company-type">Financial Services</span>
+                        </div>
+                        <StatusBadge status={companyPrivileges.length > 0 ? 'success' : 'warning'}>
+                          {companyPrivileges.length} Privilege{companyPrivileges.length !== 1 ? 's' : ''}
+                        </StatusBadge>
+                      </div>
+                      
+                      <PrivilegeList>
+                        {companyPrivileges.length > 0 ? (
+                          companyPrivileges.map(privilege => (
+                            <PrivilegeItem key={privilege.autoid} isActive={privilege.is_active}>
+                              <div className="privilege-info">
+                                <div className="privilege-name">{privilege.privilege_name}</div>
+                                <div className="privilege-description">{privilege.privilege_description}</div>
+                              </div>
+                              <div className="privilege-level">
+                                <span className="level-badge">{privilege.privilege_level}</span>
+                                <Button size="sm" variant="ghost">Edit</Button>
+                              </div>
+                            </PrivilegeItem>
+                          ))
+                        ) : (
+                          <div style={{ 
+                            textAlign: 'center', 
+                            padding: '2rem', 
+                            color: '#64748b',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px dashed #cbd5e1'
+                          }}>
+                            <p style={{ margin: 0, fontSize: '0.875rem' }}>
+                              No privileges configured for this company
+                            </p>
+                          </div>
+                        )}
+                      </PrivilegeList>
+                    </PrivilegeCard>
+                  );
+                })}
+              </SettingsGrid>
             </Card>
           )}
         </ContentLayout>
       </MainContent>
+
+      {/* Right Navigation Pane */}
+      <NavPaneToggle 
+        isNavOpen={isNavPaneOpen} 
+        onClick={() => setIsNavPaneOpen(!isNavPaneOpen)}
+      >
+        {isNavPaneOpen ? (
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        )}
+      </NavPaneToggle>
+
+      <RightNavPane isOpen={isNavPaneOpen}>
+        <NavPaneHeader>
+          <div className="user-info">
+            <div className="avatar">
+              JD
+            </div>
+            <div className="user-details">
+              <h4 className="user-name">John Doe</h4>
+              <p className="user-id">USER001</p>
+            </div>
+          </div>
+        </NavPaneHeader>
+
+        <NavPaneContent>
+          <NavMenuItem>
+            <div className="icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            Reports
+          </NavMenuItem>
+          
+          <NavMenuItem>
+            <div className="icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            Settings
+          </NavMenuItem>
+
+          <NavMenuItem onClick={handleLogout}>
+            <div className="icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </div>
+            Logout
+          </NavMenuItem>
+        </NavPaneContent>
+      </RightNavPane>
+
+      {/* View Files Modal */}
+      {showFilesModal && selectedRequestFiles && (
+        <ViewFilesModal onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowFilesModal(false);
+          }
+        }}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <h3>Files for {selectedRequestFiles.requestId}</h3>
+              <button 
+                className="close-button" 
+                onClick={() => setShowFilesModal(false)}
+              >
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </ModalHeader>
+
+            <ModalBody>
+              <FileList>
+                {selectedRequestFiles.files.map((file, index) => (
+                  <FileItem 
+                    key={file.id}
+                    isSelected={index === selectedFileIndex}
+                    onClick={() => setSelectedFileIndex(index)}
+                  >
+                    <div className={`file-icon ${file.type}`}>
+                      {getFileIcon(file.type)}
+                    </div>
+                    <div className="file-info">
+                      <h4 className="file-name" title={file.name}>{file.name}</h4>
+                      <p className="file-size">{file.size}</p>
+                    </div>
+                  </FileItem>
+                ))}
+              </FileList>
+
+              <FilePreview>
+                {selectedRequestFiles.files[selectedFileIndex] && (
+                  <>
+                    <div className="preview-header">
+                      <h4 className="file-title">
+                        {selectedRequestFiles.files[selectedFileIndex].name}
+                      </h4>
+                      <div className="file-actions">
+                        {(selectedRequestFiles.files[selectedFileIndex].type === 'docx' || 
+                          selectedRequestFiles.files[selectedFileIndex].type === 'video') && (
+                          <Button 
+                            size="sm" 
+                            variant="primary"
+                            onClick={() => handleFileDownload(selectedRequestFiles.files[selectedFileIndex])}
+                          >
+                            Download
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="preview-content">
+                      {(() => {
+                        const currentFile = selectedRequestFiles.files[selectedFileIndex];
+                        
+                        if (currentFile.type === 'image') {
+                          return (
+                            <img 
+                              src={currentFile.url} 
+                              alt={currentFile.name}
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBGb3VuZDwvdGV4dD48L3N2Zz4=';
+                              }}
+                            />
+                          );
+                        }
+                        
+                        if (currentFile.type === 'pdf') {
+                          return (
+                            <iframe 
+                              src={`${currentFile.url}#toolbar=0`}
+                              title={currentFile.name}
+                            />
+                          );
+                        }
+                        
+                        if (currentFile.type === 'video') {
+                          return (
+                            <video controls>
+                              <source src={currentFile.url} type="video/mp4" />
+                              Your browser does not support the video tag.
+                            </video>
+                          );
+                        }
+                        
+                        return (
+                          <div className="no-preview">
+                            <div className="icon">📄</div>
+                            <h4>{currentFile.type === 'docx' ? 'Document File' : 'File Not Supported'}</h4>
+                            <p>
+                              {currentFile.type === 'docx' 
+                                ? 'Click download to view this document'
+                                : 'This file type cannot be previewed'
+                              }
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </>
+                )}
+              </FilePreview>
+            </ModalBody>
+          </ModalContent>
+        </ViewFilesModal>
+      )}
     </DashboardContainer>
   );
 }

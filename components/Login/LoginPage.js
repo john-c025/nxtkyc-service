@@ -37,13 +37,13 @@ export default function LoginPage() {
 
     try {
       const response = await axiosInstance.post(API_ENDPOINTS.LOGIN, {
-        username,
-        password,
-      });
+          username,
+          password,
+        });
 
       console.log('Login successful:', response.data);
       Cookies.set('authToken', response.data.token, { expires: 7 });
-      router.push('/dashboard');
+          router.push('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       
@@ -66,7 +66,7 @@ export default function LoginPage() {
           <div className="logo">
             <h1>NXT KYC</h1>
             <p>Know Your Customer System</p>
-          </div>
+      </div>
         </LogoSection>
 
         <FormSection>
@@ -77,9 +77,9 @@ export default function LoginPage() {
             <InputGroup>
               <Input
                 type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </InputGroup>
@@ -87,9 +87,9 @@ export default function LoginPage() {
             <InputGroup>
               <Input
                 type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </InputGroup>

@@ -3,20 +3,20 @@
 import styled from '@emotion/styled';
 import { keyframes, css } from '@emotion/react';
 
-// Universal Color System (imported from MainDashboardStyled.js)
+// Universal Color System - Pastel Yellow Theme
 const colors = {
-  // Primary Colors (Blue-based for professional look)
+  // Primary Colors (Yellow-based for warm, professional look)
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
+    50: '#fefdf8',
+    100: '#fef3c7',
+    200: '#fde68a',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
   },
   
   // Secondary Colors (Slate for neutral elements)
@@ -276,8 +276,9 @@ export const ContentLayout = styled.div`
   display: flex;
   flex-direction: column;
   gap: 2rem;
-  max-width: 1400px;
+  max-width: 1800px;
   margin: 0 auto;
+  width: 100%;
   
   @media (max-width: 768px) {
     padding: 1rem;
@@ -617,6 +618,144 @@ export const CompanyFilterContainer = styled.div`
   }
 `;
 
+// Filter and Sort Controls
+export const FilterSortContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: ${colors.background.primary};
+  border: 1px solid ${colors.border.light};
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  
+  @media (max-width: 768px) {
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+`;
+
+export const FilterGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 140px;
+  
+  label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: ${colors.text.secondary};
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  select {
+    padding: 0.625rem 0.75rem;
+    border: 1px solid ${colors.border.medium};
+    border-radius: 8px;
+    background: ${colors.background.primary};
+    color: ${colors.text.primary};
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    
+    &:focus {
+      outline: none;
+      border-color: ${colors.primary[500]};
+      box-shadow: 0 0 0 3px ${colors.primary[100]};
+    }
+    
+    &:hover {
+      border-color: ${colors.border.strong};
+    }
+  }
+  
+  @media (max-width: 768px) {
+    min-width: 120px;
+  }
+`;
+
+export const SortGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 140px;
+  
+  label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: ${colors.text.secondary};
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .sort-controls {
+    display: flex;
+    gap: 0.5rem;
+    
+    select {
+      flex: 1;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid ${colors.border.medium};
+      border-radius: 8px;
+      background: ${colors.background.primary};
+      color: ${colors.text.primary};
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
+      
+      &:focus {
+        outline: none;
+        border-color: ${colors.primary[500]};
+        box-shadow: 0 0 0 3px ${colors.primary[100]};
+      }
+      
+      &:hover {
+        border-color: ${colors.border.strong};
+      }
+    }
+    
+    button {
+      padding: 0.625rem;
+      border: 1px solid ${colors.border.medium};
+      border-radius: 8px;
+      background: ${colors.background.primary};
+      color: ${colors.text.secondary};
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      &:hover {
+        background: ${colors.primary[50]};
+        border-color: ${colors.primary[300]};
+        color: ${colors.primary[600]};
+      }
+      
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+`;
+
+export const FilterActions = styled.div`
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
+  
+  @media (max-width: 768px) {
+    margin-left: 0;
+    width: 100%;
+    justify-content: stretch;
+    
+    button {
+      flex: 1;
+    }
+  }
+`;
+
 // KYC Specific Components
 export const DocumentUploadArea = styled.div`
   border: 2px dashed ${colors.border.medium};
@@ -715,6 +854,587 @@ export const VerificationStep = styled.div`
       font-size: 0.75rem;
       color: ${colors.text.tertiary};
     }
+  }
+`;
+
+// Action Button Container
+export const ActionButtonsContainer = styled.div`
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 200px;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+`;
+
+// KYC Settings Components
+export const SettingsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+`;
+
+export const PrivilegeCard = styled.div`
+  background: ${colors.background.primary};
+  border: 1px solid ${colors.border.light};
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${colors.shadow.medium};
+    border-color: ${colors.primary[200]};
+  }
+  
+  .company-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid ${colors.border.light};
+    
+    h3 {
+      margin: 0;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: ${colors.text.primary};
+    }
+    
+    .company-type {
+      font-size: 0.75rem;
+      color: ${colors.text.tertiary};
+      background: ${colors.primary[100]};
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+    }
+  }
+`;
+
+export const PrivilegeList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`;
+
+export const PrivilegeItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: ${props => props.isActive ? colors.primary[50] : colors.background.secondary};
+  border: 1px solid ${props => props.isActive ? colors.primary[200] : colors.border.light};
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${colors.primary[50]};
+    border-color: ${colors.primary[200]};
+  }
+  
+  .privilege-info {
+    flex: 1;
+    
+    .privilege-name {
+      font-weight: 600;
+      color: ${colors.text.primary};
+      margin: 0 0 0.25rem 0;
+      font-size: 0.875rem;
+    }
+    
+    .privilege-description {
+      color: ${colors.text.tertiary};
+      font-size: 0.75rem;
+      margin: 0;
+      line-height: 1.4;
+    }
+  }
+  
+  .privilege-level {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    
+    .level-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: ${props => props.isActive ? colors.primary[500] : colors.neutral[300]};
+      color: ${props => props.isActive ? 'white' : colors.text.tertiary};
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+  }
+`;
+
+export const PrivilegeForm = styled.form`
+  background: ${colors.background.primary};
+  border: 1px solid ${colors.border.light};
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  
+  .form-header {
+    margin-bottom: 1.5rem;
+    
+    h3 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: ${colors.text.primary};
+    }
+    
+    p {
+      margin: 0;
+      color: ${colors.text.tertiary};
+      font-size: 0.875rem;
+    }
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    
+    label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: ${colors.text.secondary};
+    }
+    
+    input, select, textarea {
+      padding: 0.75rem;
+      border: 1px solid ${colors.border.medium};
+      border-radius: 8px;
+      background: ${colors.background.primary};
+      color: ${colors.text.primary};
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
+      
+      &:focus {
+        outline: none;
+        border-color: ${colors.primary[500]};
+        box-shadow: 0 0 0 3px ${colors.primary[100]};
+      }
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid ${colors.border.light};
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+`;
+
+// View Files Modal Components
+export const ViewFilesModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: ${fadeIn} 0.3s ease-out;
+  padding: 1rem;
+`;
+
+export const ModalContent = styled.div`
+  background: ${colors.background.primary};
+  border-radius: 16px;
+  max-width: 1200px;
+  max-height: 90vh;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  animation: ${scaleIn} 0.3s ease-out;
+`;
+
+export const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid ${colors.border.light};
+  background: ${colors.primary[50]};
+  
+  h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: ${colors.text.primary};
+  }
+  
+  .close-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    color: ${colors.text.secondary};
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background: ${colors.primary[100]};
+      color: ${colors.primary[600]};
+    }
+    
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+`;
+
+export const ModalBody = styled.div`
+  flex: 1;
+  overflow: auto;
+  padding: 1.5rem 2rem;
+  display: flex;
+  gap: 1.5rem;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+`;
+
+export const FileList = styled.div`
+  min-width: 280px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  
+  @media (max-width: 768px) {
+    min-width: unset;
+    max-width: unset;
+  }
+`;
+
+export const FileItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid ${props => props.isSelected ? colors.primary[300] : colors.border.light};
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: ${props => props.isSelected ? colors.primary[50] : colors.background.primary};
+  
+  &:hover {
+    border-color: ${colors.primary[200]};
+    background: ${colors.primary[25]};
+  }
+  
+  .file-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.75rem;
+    
+    &.image {
+      background: ${colors.success[500]};
+    }
+    
+    &.pdf {
+      background: ${colors.error[500]};
+    }
+    
+    &.docx {
+      background: ${colors.primary[500]};
+    }
+    
+    &.video {
+      background: ${colors.warning[500]};
+    }
+    
+    &.restricted {
+      background: ${colors.neutral[400]};
+    }
+  }
+  
+  .file-info {
+    flex: 1;
+    min-width: 0;
+    
+    .file-name {
+      font-weight: 500;
+      color: ${colors.text.primary};
+      margin: 0 0 0.25rem 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.875rem;
+    }
+    
+    .file-size {
+      color: ${colors.text.tertiary};
+      font-size: 0.75rem;
+      margin: 0;
+    }
+  }
+`;
+
+export const FilePreview = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+  background: ${colors.background.secondary};
+  border-radius: 12px;
+  overflow: hidden;
+  
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: ${colors.background.primary};
+    border-bottom: 1px solid ${colors.border.light};
+    
+    .file-title {
+      font-weight: 600;
+      color: ${colors.text.primary};
+      margin: 0;
+    }
+    
+    .file-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+  
+  .preview-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    position: relative;
+    
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 8px;
+    }
+    
+    video {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 8px;
+    }
+    
+    .no-preview {
+      text-align: center;
+      color: ${colors.text.tertiary};
+      
+      .icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: ${colors.text.disabled};
+      }
+      
+      h4 {
+        margin: 0 0 0.5rem 0;
+        color: ${colors.text.secondary};
+      }
+      
+      p {
+        margin: 0;
+        font-size: 0.875rem;
+      }
+    }
+  }
+`;
+
+// Right Navigation Pane Components
+export const RightNavPane = styled.div`
+  position: fixed;
+  top: 0;
+  right: ${props => props.isOpen ? '0' : '-320px'};
+  width: 320px;
+  height: 100vh;
+  background: ${colors.background.primary};
+  border-left: 1px solid ${colors.border.light};
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+  z-index: 900;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  
+  @media (max-width: 768px) {
+    width: 280px;
+    right: ${props => props.isOpen ? '0' : '-280px'};
+  }
+`;
+
+export const NavPaneHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid ${colors.border.light};
+  background: ${colors.primary[50]};
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: ${colors.primary[500]};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 1.25rem;
+    }
+    
+    .user-details {
+      flex: 1;
+      
+      .user-name {
+        font-weight: 600;
+        color: ${colors.text.primary};
+        margin: 0 0 0.25rem 0;
+        font-size: 1rem;
+      }
+      
+      .user-id {
+        color: ${colors.text.tertiary};
+        font-size: 0.75rem;
+        margin: 0;
+        font-family: monospace;
+      }
+    }
+  }
+`;
+
+export const NavPaneContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 0;
+`;
+
+export const NavMenuItem = styled.button`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: ${props => props.isActive ? colors.primary[100] : 'transparent'};
+  color: ${props => props.isActive ? colors.primary[700] : colors.text.secondary};
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  font-weight: 500;
+  
+  &:hover {
+    background: ${colors.primary[50]};
+    color: ${colors.primary[600]};
+  }
+  
+  .icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
+export const NavPaneToggle = styled.button`
+  position: fixed;
+  top: 20px;
+  right: ${props => props.isNavOpen ? '340px' : '20px'};
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: ${colors.primary[500]};
+  border: none;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 950;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background: ${colors.primary[600]};
+    transform: scale(1.05);
+  }
+  
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  @media (max-width: 768px) {
+    right: ${props => props.isNavOpen ? '300px' : '20px'};
   }
 `;
 
