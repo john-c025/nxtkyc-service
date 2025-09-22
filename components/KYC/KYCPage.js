@@ -100,9 +100,9 @@ export default function KYCPage() {
       // Company details
       company: {
         company_id: 1,
-        company_name: 'Acme Corporation',
-        company_code: 'ACME-001',
-        company_type: 'Financial Services',
+        company_name: 'Blooms Wellness',
+        company_code: '3297',
+        company_type: 'Networking',
         is_active: true
       },
       // File count
@@ -142,9 +142,9 @@ export default function KYCPage() {
       },
       company: {
         company_id: 2,
-        company_name: 'Tech Solutions Inc',
-        company_code: 'TECH-002',
-        company_type: 'Technology',
+        company_name: 'Nanucell',
+        company_code: '62144',
+        company_type: 'Networking',
         is_active: true
       },
       file_count: 2
@@ -183,9 +183,9 @@ export default function KYCPage() {
       },
       company: {
         company_id: 3,
-        company_name: 'Global Finance Ltd',
-        company_code: 'GLOBAL-003',
-        company_type: 'Banking',
+        company_name: 'Worldwide Premiere',
+        company_code: '97821',
+        company_type: 'Networking',
         is_active: true
       },
       file_count: 2
@@ -224,9 +224,9 @@ export default function KYCPage() {
       },
       company: {
         company_id: 4,
-        company_name: 'StartupXYZ',
-        company_code: 'STARTUP-004',
-        company_type: 'Startup',
+        company_name: 'Nextapp',
+        company_code: '345254',
+        company_type: 'Software',
         is_active: true
       },
       file_count: 4
@@ -281,7 +281,7 @@ export default function KYCPage() {
       autoid: 3,
       company_id: 2,
       privilege_level: 1,
-      privilege_name: 'Tech Startup Basic',
+      privilege_name: 'Level 1',
       privilege_description: 'Streamlined verification for tech startup clients',
       privileges_json: JSON.stringify({
         documents_required: ['ID', 'Business Registration'],
@@ -294,8 +294,8 @@ export default function KYCPage() {
       created_by: 'ADMIN001',
       updated_by: 'ADMIN001',
       company: {
-        company_name: 'Tech Solutions Inc',
-        company_type: 'Technology'
+        company_name: 'Nanucell ',
+        company_type: 'Networking'
       }
     }
   ];

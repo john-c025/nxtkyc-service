@@ -144,14 +144,14 @@ export const LogoSection = styled.div`
   .logo {
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin: 0 0 8px 0;
-      letter-spacing: -0.025em;
+    img {
       animation: ${slideInLeft} 0.8s ease-out;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
     }
 
     p {

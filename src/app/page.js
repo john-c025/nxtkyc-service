@@ -177,7 +177,15 @@ export default function LoginPage() {
       <LoginCard>
         <LogoSection>
           <div className="logo">
-            <h1>NXT KYC</h1>
+            <img 
+              src="/assets/logo_transparent.png" 
+              alt="NXTKYC by NextApp Solutions Corp." 
+              style={{
+                maxWidth: '500px',
+                height: 'auto',
+                marginBottom: '1rem'
+              }}
+            />
             <p>Know Your Customer System</p>
             {/* <FeatureBadge>
               <span>🔒</span>
