@@ -593,7 +593,7 @@ export default function KYCPage() {
                 isActive={activeTab === 'settings'} 
                 onClick={() => setActiveTab('settings')}
               >
-                Privilege Settings
+                Company Privilege Settings
               </TabButton>
             </TabList>
           </TabContainer>

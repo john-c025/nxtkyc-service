@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { keyframes } from '@emotion/react';
 import { 
   DashboardContainer, 
   MainContent, 
@@ -36,6 +37,17 @@ import {
   AlertBox
 } from './ClientKYCPageStyled';
 
+const fadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
 export default function ClientKYCPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState([]);
@@ -68,18 +80,7 @@ export default function ClientKYCPage() {
     addressDocument: null,
     addressDocumentType: '',
     
-    // Financial Information (stored in account_metadata as JSON)
-    occupation: '',
-    employer: '',
-    annualIncome: '',
-    sourceOfFunds: '',
-    bankStatement: null,
-    
-    // Compliance Information (stored in account_metadata as JSON)
-    pepStatus: false,
-    pepDetails: '',
-    sanctionsCheck: false,
-    riskAssessment: '',
+    // Simplified form - removed financial and compliance sections
     
     // Terms and Conditions (stored in account_metadata as JSON)
     termsAccepted: false,
@@ -105,9 +106,13 @@ export default function ClientKYCPage() {
     is_active: true // Default active
   });
   
-  const [uploadedDocuments, setUploadedDocuments] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState(null);
+   const [uploadedDocuments, setUploadedDocuments] = useState([]);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [submitStatus, setSubmitStatus] = useState(null);
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+   // Company name - this will be dynamically set based on the client company using the service
+   const companyName = "Blooms Wellness"; // TODO: Make this dynamic based on company_id or auth context
 
   const steps = [
     {
@@ -130,18 +135,6 @@ export default function ClientKYCPage() {
     },
     {
       id: 4,
-      title: 'Financial Information',
-      description: 'Employment, income, and financial documentation',
-      icon: '💰'
-    },
-    {
-      id: 5,
-      title: 'Compliance Check',
-      description: 'PEP status, sanctions, and risk assessment',
-      icon: '✅'
-    },
-    {
-      id: 6,
       title: 'Review & Submit',
       description: 'Review all information and submit for verification',
       icon: '📋'
@@ -189,11 +182,6 @@ export default function ClientKYCPage() {
         return formData.identityType && formData.identityNumber && 
                formData.identityExpiry && formData.identityDocument;
       case 4:
-        return formData.occupation && formData.employer && 
-               formData.annualIncome && formData.sourceOfFunds;
-      case 5:
-        return formData.pepStatus !== null && formData.sanctionsCheck !== null;
-      case 6:
         return formData.termsAccepted && formData.privacyAccepted;
       default:
         return false;
@@ -244,18 +232,6 @@ export default function ClientKYCPage() {
           identityType: formData.identityType,
           identityNumber: formData.identityNumber,
           identityExpiry: formData.identityExpiry
-        },
-        financial_info: {
-          occupation: formData.occupation,
-          employer: formData.employer,
-          annualIncome: formData.annualIncome,
-          sourceOfFunds: formData.sourceOfFunds
-        },
-        compliance_info: {
-          pepStatus: formData.pepStatus,
-          pepDetails: formData.pepDetails,
-          sanctionsCheck: formData.sanctionsCheck,
-          riskAssessment: formData.riskAssessment
         },
         terms_info: {
           termsAccepted: formData.termsAccepted,
@@ -367,21 +343,113 @@ export default function ClientKYCPage() {
             </HeaderTitle>
           </HeaderContent>
           <HeaderActions>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                Step {currentStep} of {steps.length}
-              </span>
-              <ProgressBar 
-                progress={(currentStep / steps.length) * 100}
-                total={steps.length}
-                current={currentStep}
-              />
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '1.5rem',
+              '@media (max-width: 768px)': {
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '0.75rem'
+              }
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'flex-end',
+                gap: '0.25rem'
+              }}>
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Applying for Level {formData.level_to_upgrade_to}
+                </div>
+                <span style={{ 
+                  fontSize: '0.75rem', 
+                  color: '#64748b',
+                  textAlign: 'right',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {formData.level_to_upgrade_to === 1 ? 'Basic Verification' : 
+                   formData.level_to_upgrade_to === 2 ? 'Enhanced Verification' :
+                   formData.level_to_upgrade_to === 3 ? 'Premium Verification' :
+                   'Enterprise Verification'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <span style={{ 
+                  fontSize: '0.875rem', 
+                  color: '#64748b',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Step {currentStep} of {steps.length}
+                </span>
+                <ProgressBar 
+                  progress={(currentStep / steps.length) * 100}
+                  total={steps.length}
+                  current={currentStep}
+                />
+              </div>
             </div>
           </HeaderActions>
         </TopBar>
 
-        <ContentLayout>
-          <WaterfallContainer>
+         <ContentLayout>
+           {/* Company Banner */}
+           <div style={{
+             textAlign: 'center',
+             marginBottom: '2rem',
+             padding: '1.5rem',
+             background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.05) 100%)',
+             borderRadius: '16px',
+             border: '2px solid rgba(245, 158, 11, 0.25)',
+             boxShadow: '0 4px 20px rgba(245, 158, 11, 0.15)',
+             backdropFilter: 'blur(10px)',
+             position: 'relative',
+             overflow: 'hidden',
+             transition: 'all 0.3s ease',
+             animation: `${fadeInUp} 0.6s ease-out`
+           }}>
+             <div style={{
+               color: '#f59e0b',
+               fontSize: '1.5rem',
+               fontWeight: '700',
+               marginBottom: '0.5rem',
+               letterSpacing: '0.05em',
+               textShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+               transition: 'color 0.3s ease'
+             }}>
+               {companyName}
+             </div>
+             <div style={{
+               color: '#64748b',
+               fontSize: '0.875rem',
+               fontWeight: '500',
+               letterSpacing: '0.025em',
+               transition: 'color 0.3s ease'
+             }}>
+               KYC Verification Service
+             </div>
+             {/* Enhanced gradient overlay */}
+             <div style={{
+               position: 'absolute',
+               top: 0,
+               left: 0,
+               right: 0,
+               bottom: 0,
+               background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(217, 119, 6, 0.08) 100%)',
+               pointerEvents: 'none'
+             }} />
+           </div>
+
+           <WaterfallContainer>
             {/* Step Indicators */}
             <StepContainer>
               {steps.map((step) => (
@@ -566,11 +634,19 @@ export default function ClientKYCPage() {
                     </div>
                     <InputGroup>
                       <label>Proof of Address Document *</label>
-                      <FileUpload
-                        onFileSelect={(file) => handleFileUpload('addressDocument', file)}
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        maxSize={5 * 1024 * 1024} // 5MB
-                      >
+                      <FileUpload>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file && file.size <= 5 * 1024 * 1024) {
+                              handleFileUpload('addressDocument', file);
+                            } else {
+                              alert('File size must be under 5MB');
+                            }
+                          }}
+                        />
                         <DocumentUploadArea>
                           <div style={{ textAlign: 'center' }}>
                             <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -644,11 +720,19 @@ export default function ClientKYCPage() {
                     </InputGroup>
                     <InputGroup>
                       <label>Upload Identity Document *</label>
-                      <FileUpload
-                        onFileSelect={(file) => handleFileUpload('identityDocument', file)}
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        maxSize={10 * 1024 * 1024} // 10MB
-                      >
+                      <FileUpload>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file && file.size <= 10 * 1024 * 1024) {
+                              handleFileUpload('identityDocument', file);
+                            } else {
+                              alert('File size must be under 10MB');
+                            }
+                          }}
+                        />
                         <DocumentUploadArea>
                           <div style={{ textAlign: 'center' }}>
                             <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -665,139 +749,8 @@ export default function ClientKYCPage() {
                   </FormSection>
                 )}
 
-                {/* Step 4: Financial Information */}
+                {/* Step 4: Review & Submit */}
                 {currentStep === 4 && (
-                  <FormSection>
-                    <InputGroup>
-                      <label>Occupation *</label>
-                      <input
-                        type="text"
-                        value={formData.occupation}
-                        onChange={(e) => handleInputChange('occupation', e.target.value)}
-                        placeholder="Enter your occupation"
-                      />
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Employer/Company *</label>
-                      <input
-                        type="text"
-                        value={formData.employer}
-                        onChange={(e) => handleInputChange('employer', e.target.value)}
-                        placeholder="Enter your employer or company name"
-                      />
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Annual Income *</label>
-                      <select
-                        value={formData.annualIncome}
-                        onChange={(e) => handleInputChange('annualIncome', e.target.value)}
-                      >
-                        <option value="">Select your annual income range</option>
-                        <option value="under-25k">Under $25,000</option>
-                        <option value="25k-50k">$25,000 - $50,000</option>
-                        <option value="50k-75k">$50,000 - $75,000</option>
-                        <option value="75k-100k">$75,000 - $100,000</option>
-                        <option value="100k-150k">$100,000 - $150,000</option>
-                        <option value="150k-250k">$150,000 - $250,000</option>
-                        <option value="over-250k">Over $250,000</option>
-                      </select>
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Source of Funds *</label>
-                      <select
-                        value={formData.sourceOfFunds}
-                        onChange={(e) => handleInputChange('sourceOfFunds', e.target.value)}
-                      >
-                        <option value="">Select your primary source of funds</option>
-                        <option value="employment">Employment Income</option>
-                        <option value="business">Business Income</option>
-                        <option value="investment">Investment Returns</option>
-                        <option value="inheritance">Inheritance</option>
-                        <option value="gift">Gift</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Bank Statement (Optional)</label>
-                      <FileUpload
-                        onFileSelect={(file) => handleFileUpload('bankStatement', file)}
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        maxSize={5 * 1024 * 1024} // 5MB
-                      >
-                        <DocumentUploadArea>
-                          <div style={{ textAlign: 'center' }}>
-                            <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            <p>Upload bank statement (optional)</p>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              PDF, JPG, PNG up to 5MB
-                            </p>
-                          </div>
-                        </DocumentUploadArea>
-                      </FileUpload>
-                    </InputGroup>
-                  </FormSection>
-                )}
-
-                {/* Step 5: Compliance Check */}
-                {currentStep === 5 && (
-                  <FormSection>
-                    <InputGroup>
-                      <label>Are you a Politically Exposed Person (PEP)? *</label>
-                      <RadioGroup>
-                        <label>
-                          <input
-                            type="radio"
-                            name="pepStatus"
-                            value="false"
-                            checked={formData.pepStatus === false}
-                            onChange={(e) => handleInputChange('pepStatus', e.target.value === 'true')}
-                          />
-                          No
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="pepStatus"
-                            value="true"
-                            checked={formData.pepStatus === true}
-                            onChange={(e) => handleInputChange('pepStatus', e.target.value === 'true')}
-                          />
-                          Yes
-                        </label>
-                      </RadioGroup>
-                      {formData.pepStatus && (
-                        <textarea
-                          value={formData.pepDetails}
-                          onChange={(e) => handleInputChange('pepDetails', e.target.value)}
-                          placeholder="Please provide details about your PEP status"
-                          rows={3}
-                        />
-                      )}
-                    </InputGroup>
-                    <InputGroup>
-                      <label>Sanctions Check *</label>
-                      <CheckboxGroup>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={formData.sanctionsCheck}
-                            onChange={(e) => handleInputChange('sanctionsCheck', e.target.checked)}
-                          />
-                          I confirm that I am not subject to any sanctions or restrictions
-                        </label>
-                      </CheckboxGroup>
-                    </InputGroup>
-                    <AlertBox type="info">
-                      <strong>Important:</strong> All information provided will be verified through our compliance systems. 
-                      Providing false information may result in account suspension or legal action.
-                    </AlertBox>
-                  </FormSection>
-                )}
-
-                {/* Step 6: Review & Submit */}
-                {currentStep === 6 && (
                   <FormSection>
                     <div style={{ marginBottom: '2rem' }}>
                       <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 1rem 0', color: '#0f172a' }}>
@@ -845,12 +798,24 @@ export default function ClientKYCPage() {
                       </div>
                     </div>
 
+                    {/* Identity Verification Summary */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.75rem 0', color: '#0f172a' }}>
+                        Identity Verification
+                      </h4>
+                      <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', fontSize: '0.875rem' }}>
+                        <p><strong>Document Type:</strong> {formData.identityType ? formData.identityType.replace('_', ' ').toUpperCase() : 'N/A'}</p>
+                        <p><strong>Document Number:</strong> {formData.identityNumber || 'N/A'}</p>
+                        <p><strong>Expiry Date:</strong> {formData.identityExpiry || 'N/A'}</p>
+                      </div>
+                    </div>
+
                     {/* KYC Request Summary */}
                     <div style={{ marginBottom: '1.5rem' }}>
                       <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.75rem 0', color: '#0f172a' }}>
                         KYC Request Details (Database Fields)
                       </h4>
-                      <div style={{ background: '#f0f9ff', padding: '1rem', borderRadius: '8px', fontSize: '0.875rem' }}>
+                      <div style={{ background: '#fef3c7', padding: '1rem', borderRadius: '8px', fontSize: '0.875rem' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                           <div>
                             <p><strong>Request Type:</strong> {formData.request_type}</p>

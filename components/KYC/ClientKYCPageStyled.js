@@ -3,23 +3,38 @@
 import styled from '@emotion/styled';
 import { keyframes, css } from '@emotion/react';
 
-// Universal Color System (imported from MainDashboardStyled.js)
+// Universal Color System (Pastel Yellow Theme - matching KYCPage.js and LoginPage.js)
 const colors = {
-  // Primary Colors (Blue-based for professional look)
+  // Primary Colors (Pastel Yellow based)
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
+    25: '#fefdf8',
+    50: '#fef3c7',
+    100: '#fde68a',
+    200: '#fcd34d',
+    300: '#fbbf24',
+    400: '#f59e0b',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
   },
   
-  // Secondary Colors (Slate for neutral elements)
+  // Yellow color variations
+  yellow: {
+    50: '#fef3c7',
+    100: '#fde68a',
+    200: '#fcd34d',
+    300: '#fbbf24',
+    400: '#f59e0b',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+  },
+  
+  // Secondary Colors (Neutral grays)
   neutral: {
     50: '#f8fafc',
     100: '#f1f5f9',
@@ -31,20 +46,6 @@ const colors = {
     700: '#334155',
     800: '#1e293b',
     900: '#0f172a',
-  },
-  
-  // Accent Colors
-  accent: {
-    50: '#fdf4ff',
-    100: '#fae8ff',
-    200: '#f5d0fe',
-    300: '#f0abfc',
-    400: '#e879f9',
-    500: '#d946ef',
-    600: '#c026d3',
-    700: '#a21caf',
-    800: '#86198f',
-    900: '#701a75',
   },
   
   // Success Colors
@@ -61,7 +62,7 @@ const colors = {
     900: '#14532d',
   },
   
-  // Warning Colors
+  // Warning Colors (Yellow tones)
   warning: {
     50: '#fffbeb',
     100: '#fef3c7',
@@ -92,9 +93,9 @@ const colors = {
   // Background Colors
   background: {
     primary: '#ffffff',
-    secondary: '#f8fafc',
-    tertiary: '#f1f5f9',
-    overlay: 'rgba(15, 23, 42, 0.05)',
+    secondary: '#fefdf8',
+    tertiary: '#fef3c7',
+    overlay: 'rgba(245, 158, 11, 0.05)',
   },
   
   // Text Colors
@@ -108,17 +109,17 @@ const colors = {
   
   // Border Colors
   border: {
-    light: '#e2e8f0',
-    medium: '#cbd5e1',
-    strong: '#94a3b8',
+    light: '#fde68a',
+    medium: '#fcd34d',
+    strong: '#f59e0b',
   },
   
   // Shadow Colors
   shadow: {
-    light: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-    medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    large: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    light: '0 1px 3px 0 rgba(245, 158, 11, 0.1), 0 1px 2px 0 rgba(245, 158, 11, 0.06)',
+    medium: '0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06)',
+    large: '0 10px 15px -3px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(245, 158, 11, 0.05)',
+    xl: '0 20px 25px -5px rgba(245, 158, 11, 0.1), 0 10px 10px -5px rgba(245, 158, 11, 0.04)',
   }
 };
 
@@ -171,6 +172,17 @@ const pulse = keyframes`
   }
   50% {
     opacity: 0.5;
+  }
+`;
+
+const fadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 `;
 
@@ -318,7 +330,7 @@ export const Card = styled.div`
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, ${colors.primary[500]}, ${colors.accent[500]});
+    background: linear-gradient(90deg, ${colors.primary[500]}, ${colors.primary[700]});
     opacity: 0;
     transition: opacity 0.3s ease;
   }
@@ -576,7 +588,7 @@ export const ProgressBar = styled.div`
     left: 0;
     height: 100%;
     width: ${props => props.progress}%;
-    background: linear-gradient(90deg, ${colors.primary[500]}, ${colors.accent[500]});
+    background: linear-gradient(90deg, ${colors.primary[500]}, ${colors.primary[700]});
     transition: width 0.3s ease;
   }
   

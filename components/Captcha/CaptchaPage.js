@@ -45,6 +45,7 @@ export default function CaptchaPage() {
   });
   const [lastRegenerateTime, setLastRegenerateTime] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const canvasRef = useRef(null);
 
   // Generate random captcha text
@@ -73,8 +74,8 @@ export default function CaptchaPage() {
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
     
-    // Set background
-    ctx.fillStyle = '#f8fafc';
+    // Set background with pastel yellow theme
+    ctx.fillStyle = '#fefdf8';
     ctx.fillRect(0, 0, width, height);
     
     // Add noise lines
