@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../backend/apiHelper';
+import axiosInstance from '../backend/axiosInstance';
+import { getAuthToken, isAuthenticated, getUserFromToken } from '../../utils/cookieHelper';
 import { 
   DashboardContainer, 
   MainContent, 
@@ -61,6 +64,52 @@ export default function KYCPage() {
   const [selectedRequestFiles, setSelectedRequestFiles] = useState(null);
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [isNavPaneOpen, setIsNavPaneOpen] = useState(false);
+  
+  // API and real data state
+  const [apiMode, setApiMode] = useState(true); // Default to API mode
+  const [companies, setCompanies] = useState([]);
+  const [clientAccounts, setClientAccounts] = useState([]);
+  const [dashboardSummary, setDashboardSummary] = useState(null);
+  const [companyStatistics, setCompanyStatistics] = useState([]);
+  const [privilegeLevels, setPrivilegeLevels] = useState([]);
+  const [fileCategories, setFileCategories] = useState([]);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+  
+  // Authentication state
+  const [authStatus, setAuthStatus] = useState({
+    isAuthenticated: false,
+    user: null,
+    token: null
+  });
+  
+  // Test mode state
+  const [testMode, setTestMode] = useState(false);
+  const [showTestGenerator, setShowTestGenerator] = useState(false);
+  const [showClientCreator, setShowClientCreator] = useState(false);
+  const [testFormData, setTestFormData] = useState({
+    selectedCompany: '',
+    selectedClient: '',
+    requestType: 'initial_verification',
+    priorityLevel: 2,
+    currentLevel: 0,
+    targetLevel: 1,
+    requestDescription: '',
+    generateFiles: true,
+    fileCount: 3
+  });
+  const [clientFormData, setClientFormData] = useState({
+    selectedCompany: '',
+    fname: '',
+    mname: '',
+    sname: '',
+    email: '',
+    mobileno: '',
+    accountOriginNumber: '',
+    currentPrivilegeLevel: 0,
+    accountMetadata: ''
+  });
+  const [isGeneratingTest, setIsGeneratingTest] = useState(false);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
 
   // Mock data for KYC requests based on database schema
   const mockKycData = [
@@ -300,10 +349,403 @@ export default function KYCPage() {
     }
   ];
 
+  // API Integration Functions
+  const loadCompanies = async () => {
+    try {
+      setIsLoadingCompanies(true);
+      console.log('Loading companies from:', API_ENDPOINTS.KYC_GET_COMPANIES);
+      const response = await axiosInstance.get(API_ENDPOINTS.KYC_GET_COMPANIES);
+      console.log('Companies API response:', response.data);
+      
+      if (response.data.success) {
+        setCompanies(response.data.data);
+        console.log('Companies loaded successfully:', response.data.data);
+      } else {
+        console.error('Companies API returned success: false', response.data);
+        setCompanies([]);
+      }
+    } catch (error) {
+      console.error('Error loading companies:', error);
+      console.error('Error details:', error.response?.data);
+      // Set empty array to prevent dropdown issues
+      setCompanies([]);
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  };
+
+  const loadClientAccounts = async (companyId = null) => {
+    try {
+      const params = new URLSearchParams();
+      if (companyId) params.append('companyId', companyId);
+      
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_CLIENT_ACCOUNTS}?${params}`);
+      if (response.data.success) {
+        setClientAccounts(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading client accounts:', error);
+    }
+  };
+
+  const loadKYCRequests = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      if (selectedCompany !== 'all') params.append('companyId', selectedCompany);
+      if (selectedStatus !== 'all') params.append('status', selectedStatus);
+      if (selectedPriority !== 'all') params.append('priorityLevel', selectedPriority);
+      
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_REQUESTS}?${params}`);
+      if (response.data.success) {
+        console.log('KYC Requests API response structure:', response.data.data);
+        console.log('First request structure:', response.data.data[0]);
+        setKycRequests(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading KYC requests:', error);
+      // Fallback to mock data
+      setKycRequests(mockKycData);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadDashboardSummary = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (selectedCompany !== 'all') params.append('companyId', selectedCompany);
+      
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_DASHBOARD_SUMMARY}?${params}`);
+      if (response.data.success) {
+        setDashboardSummary(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard summary:', error);
+    }
+  };
+
+  const loadPrivilegeLevels = async (companyId = null) => {
+    try {
+      const params = new URLSearchParams();
+      if (companyId) params.append('companyId', companyId);
+      
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_PRIVILEGES}?${params}`);
+      if (response.data.success) {
+        setPrivilegeLevels(response.data.data);
+        console.log('Privilege levels loaded:', response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading privilege levels:', error);
+    }
+  };
+
+  const loadFileCategories = async () => {
+    try {
+      const response = await axiosInstance.get(API_ENDPOINTS.KYC_GET_FILE_CATEGORIES);
+      if (response.data.success) {
+        setFileCategories(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading file categories:', error);
+    }
+  };
+
+  // Load privileges for a specific company
+  const loadCompanyPrivileges = async (companyId) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_PRIVILEGES}?companyId=${companyId}`);
+      if (response.data.success) {
+        // Update the privilegeLevels state with company-specific privileges
+        setPrivilegeLevels(prev => {
+          const otherCompanies = prev.filter(p => p.company_id !== companyId);
+          return [...otherCompanies, ...response.data.data];
+        });
+        console.log(`Privileges loaded for company ${companyId}:`, response.data.data);
+      }
+    } catch (error) {
+      console.error(`Error loading privileges for company ${companyId}:`, error);
+    }
+  };
+
+  const processKYCRequest = async (kycRequestId, actionType, remarks = '') => {
+    try {
+      const response = await axiosInstance.post(API_ENDPOINTS.KYC_PROCESS_REQUEST, {
+        kyc_request_id: kycRequestId,
+        action_type: actionType,
+        remarks: remarks
+      });
+
+      if (response.data.success) {
+        // Reload requests after processing (always use API)
+        await loadKYCRequests();
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error processing KYC request:', error);
+      throw error;
+    }
+  };
+
+  // Test Client Creation Function
+  const createTestClient = async () => {
+    try {
+      setIsCreatingClient(true);
+      
+      // Phase 2: Client Account Creation using Full Details Endpoint
+      const clientData = {
+        company_id: parseInt(clientFormData.selectedCompany),
+        account_origin_number: clientFormData.accountOriginNumber || `TEST-CLIENT-${Date.now()}`,
+        fname: clientFormData.fname || 'Test',
+        mname: clientFormData.mname || 'Client',
+        sname: clientFormData.sname || `User${Date.now().toString().slice(-4)}`,
+        email: clientFormData.email || `test.client.${Date.now()}@example.com`,
+        mobileno: clientFormData.mobileno || `+1234567${Date.now().toString().slice(-3)}`,
+        current_privilege_level: clientFormData.currentPrivilegeLevel,
+        account_metadata: JSON.stringify({
+          test_generated: true,
+          generated_at: new Date().toISOString(),
+          additional_notes: clientFormData.accountMetadata || 'Test client created via admin panel'
+        })
+      };
+
+      // Validate required fields
+      if (!clientFormData.selectedCompany || isNaN(parseInt(clientFormData.selectedCompany))) {
+        throw new Error('Please select a valid company');
+      }
+
+      // Use the full client creation endpoint
+      const clientResponse = await axiosInstance.post(API_ENDPOINTS.KYC_CREATE_CLIENT_ACCOUNT, clientData);
+      
+      if (clientResponse.data.success) {
+        console.log('Test client created:', clientResponse.data.data);
+        
+        // Reload client accounts to show the new one
+        await loadClientAccounts(clientFormData.selectedCompany);
+        
+        // Show success with generated details
+        alert(`Test Client Created Successfully!
+        
+Account Code: ${clientResponse.data.data.account_code}
+Account ID: ${clientResponse.data.data.account_id}
+Full Name: ${clientData.fname} ${clientData.mname} ${clientData.sname}
+Email: ${clientData.email}
+Mobile: ${clientData.mobileno}
+Privilege Level: ${clientData.current_privilege_level}
+
+The client is now available for KYC request generation!`);
+        
+        // Reset client form
+        setClientFormData({
+          selectedCompany: '',
+          fname: '',
+          mname: '',
+          sname: '',
+          email: '',
+          mobileno: '',
+          accountOriginNumber: '',
+          currentPrivilegeLevel: 0,
+          accountMetadata: ''
+        });
+        
+        setShowClientCreator(false);
+        
+        return {
+          success: true,
+          accountCode: clientResponse.data.data.account_code,
+          accountId: clientResponse.data.data.account_id,
+          clientData: clientData,
+          message: 'Test client created successfully'
+        };
+      }
+    } catch (error) {
+      console.error('Error creating test client:', error);
+      alert(`Error: ${error.response?.data?.message || error.message || 'Failed to create test client'}`);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to create test client'
+      };
+    } finally {
+      setIsCreatingClient(false);
+    }
+  };
+
+  const generateTestKYCRequest = async () => {
+    try {
+      setIsGeneratingTest(true);
+      
+      // Phase 1: Setup & Preparation (already done - company exists)
+      
+      // Phase 2: Client Account Creation/Update (Using Upsert)
+      let clientAccountCode = testFormData.selectedClient;
+      
+      if (!clientAccountCode) {
+        // Validate company selection
+        if (!testFormData.selectedCompany || isNaN(parseInt(testFormData.selectedCompany))) {
+          throw new Error('Please select a valid company');
+        }
+
+        // Use the upsert endpoint as per documentation
+        const upsertData = {
+          account_origin_number: `TEST-${Date.now()}`,
+          company_id: parseInt(testFormData.selectedCompany),
+          current_privilege_level: testFormData.currentLevel
+        };
+
+        const upsertResponse = await axiosInstance.post(API_ENDPOINTS.KYC_UPSERT_CLIENT_ACCOUNT, upsertData);
+        if (upsertResponse.data.success) {
+          clientAccountCode = upsertResponse.data.data.account_code;
+          console.log('Test client account created:', upsertResponse.data.data);
+          
+          // Reload client accounts to show the new one
+          await loadClientAccounts(testFormData.selectedCompany);
+        } else {
+          throw new Error('Failed to create test client account');
+        }
+      }
+
+      // Phase 3: Token Generation & Link Creation
+      const tokenResponse = await axiosInstance.post(API_ENDPOINTS.KYC_GENERATE_ACCESS_TOKEN, {
+        account_code: clientAccountCode,
+        hours_valid: 24
+      });
+
+      if (tokenResponse.data.success) {
+        const { token } = tokenResponse.data.data;
+        
+        // Generate the CAPTCHA link first, then redirect to KYC
+        const captchaLink = `${window.location.origin}/captcha?token=${token}&account=${clientAccountCode}`;
+        const kycLink = `${window.location.origin}/client?token=${token}&account=${clientAccountCode}`;
+        
+        console.log('Generated KYC Link:', kycLink);
+        
+        // Phase 4: Internal KYC Request Creation (Instead of client submission)
+        const kycRequestData = {
+          account_code: clientAccountCode,
+          request_type: testFormData.requestType,
+          priority_level: testFormData.priorityLevel,
+          request_description: testFormData.requestDescription || `Test KYC request generated on ${new Date().toLocaleString()} - Link: ${kycLink}`,
+          level_to_upgrade_to: testFormData.targetLevel,
+          has_files: testFormData.generateFiles
+        };
+
+        const kycResponse = await axiosInstance.post(API_ENDPOINTS.KYC_CREATE_REQUEST, kycRequestData);
+        
+        if (kycResponse.data.success) {
+          console.log('Test KYC request created:', kycResponse.data.data);
+          
+          // Reload requests to show the new test request
+          await loadKYCRequests();
+          
+          // Show success with generated details
+          alert(`Test KYC Request Generated Successfully!
+          
+KYC Request ID: ${kycResponse.data.data.kyc_request_id}
+Account Code: ${clientAccountCode}
+Access Token: ${token.substring(0, 20)}...
+
+🔐 CAPTCHA Link (Start Here): ${captchaLink}
+📋 KYC Link (After CAPTCHA): ${kycLink}
+
+Flow: CAPTCHA → KYC Form → Submit
+The CAPTCHA link is now ready for client access!`);
+          
+          // Reset test form
+          setTestFormData({
+            selectedCompany: '',
+            selectedClient: '',
+            requestType: 'initial_verification',
+            priorityLevel: 2,
+            currentLevel: 0,
+            targetLevel: 1,
+            requestDescription: '',
+            generateFiles: true,
+            fileCount: 3
+          });
+          
+          setShowTestGenerator(false);
+          
+          return {
+            success: true,
+            kycRequestId: kycResponse.data.data.kyc_request_id,
+            accountCode: clientAccountCode,
+            token: token,
+            kycLink: kycLink,
+            message: 'Test KYC request created successfully with secure access link'
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error generating test KYC request:', error);
+      alert(`Error: ${error.response?.data?.message || error.message || 'Failed to generate test KYC request'}`);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to generate test KYC request'
+      };
+    } finally {
+      setIsGeneratingTest(false);
+    }
+  };
+
+  // Check authentication status
+  const checkAuthStatus = () => {
+    const token = getAuthToken();
+    const authenticated = isAuthenticated();
+    const user = getUserFromToken();
+    
+    setAuthStatus({
+      isAuthenticated: authenticated,
+      user: user,
+      token: token
+    });
+    
+    console.log('Authentication status:', {
+      isAuthenticated: authenticated,
+      user: user,
+      hasToken: !!token
+    });
+  };
+
+  // Initialize data
   useEffect(() => {
+    // Check authentication status first
+    checkAuthStatus();
+    
+    // Always load all necessary data on page load
+    const loadAllData = async () => {
+      try {
+        console.log('Loading all data on page initialization...');
+        
+        // Load companies first (required for dropdowns)
+        await loadCompanies();
+        
+        // Load all other data in parallel
+        await Promise.all([
+          loadKYCRequests(),
+          loadDashboardSummary(),
+          loadPrivilegeLevels(), // Load all privileges initially
+          loadFileCategories()
+        ]);
+        
+        console.log('All data loaded successfully');
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        // Fallback to mock data if API fails
     setKycRequests(mockKycData);
     setKycPrivileges(mockKycPrivileges);
-  }, []);
+      }
+    };
+    
+    loadAllData();
+  }, []); // Remove apiMode dependency since we always load API data
+
+  // Load data when filters change in API mode
+  useEffect(() => {
+    if (apiMode) {
+      loadKYCRequests();
+      loadDashboardSummary();
+    }
+  }, [selectedCompany, selectedStatus, selectedPriority, apiMode]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -358,9 +800,11 @@ export default function KYCPage() {
   };
 
   const filteredAndSortedRequests = kycRequests.filter(request => {
-    const matchesCompany = selectedCompany === 'all' || request.company.company_id.toString() === selectedCompany;
-    const matchesPriority = selectedPriority === 'all' || request.priority_level.toString() === selectedPriority;
-    const matchesStatus = selectedStatus === 'all' || request.request_status.toString() === selectedStatus;
+    const matchesCompany = selectedCompany === 'all' || 
+      (request.company?.company_id?.toString() === selectedCompany) ||
+      (request.company_id?.toString() === selectedCompany);
+    const matchesPriority = selectedPriority === 'all' || request.priority_level?.toString() === selectedPriority;
+    const matchesStatus = selectedStatus === 'all' || request.request_status?.toString() === selectedStatus;
     
     return matchesCompany && matchesPriority && matchesStatus;
   }).sort((a, b) => {
@@ -374,7 +818,7 @@ export default function KYCPage() {
         compareValue = a.kyc_request_id.localeCompare(b.kyc_request_id);
         break;
       case 'company':
-        compareValue = a.company.company_name.localeCompare(b.company.company_name);
+        compareValue = (a.company?.company_name || '').localeCompare(b.company?.company_name || '');
         break;
       case 'priority':
         compareValue = a.priority_level - b.priority_level;
@@ -422,10 +866,8 @@ export default function KYCPage() {
     );
   };
 
-  const companies = [...new Set(kycRequests.map(request => ({
-    company_id: request.company.company_id,
-    company_name: request.company.company_name
-  })))];
+  // Get companies from API data (always use API data, no fallback to mock)
+  const companiesForFilter = companies.length > 0 ? companies : [];
 
   const handleResetFilters = () => {
     setSelectedCompany('all');
@@ -570,11 +1012,593 @@ export default function KYCPage() {
             </HeaderTitle>
           </HeaderContent>
           <HeaderActions>
-            {/* Filters and Sort Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              {/* API Mode Status */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ 
+                  fontSize: '0.875rem', 
+                  color: '#10b981',
+                  fontWeight: '600',
+                  padding: '0.25rem 0.5rem',
+                  background: '#f0fdf4',
+                  borderRadius: '4px',
+                  border: '1px solid #bbf7d0'
+                }}>
+                  ✅ API Mode (Always On)
+                </div>
+              </div>
+
+              {/* Debug Info */}
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                Companies: {companies.length} | Loading: {isLoadingCompanies ? 'Yes' : 'No'}
+              </div>
+
+              {/* Authentication Status */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', color: authStatus.isAuthenticated ? '#10b981' : '#dc2626' }}>
+                  Auth: {authStatus.isAuthenticated ? '✅ Authenticated' : '❌ Not Authenticated'}
+                  {authStatus.user && (
+                    <span style={{ marginLeft: '0.5rem' }}>
+                      | User: {authStatus.user.email || authStatus.user.userId || 'Unknown'}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={checkAuthStatus}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    background: '#f3f4f6',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                  title="Refresh authentication status"
+                >
+                  🔄
+                </button>
+              </div>
+
+              {/* Test Mode Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                  <input
+                    type="checkbox"
+                    checked={testMode}
+                    onChange={(e) => setTestMode(e.target.checked)}
+                    style={{ marginRight: '0.5rem' }}
+                  />
+                  Test Mode
+                </label>
+              </div>
+
+              {/* Test Generator Button */}
+              {testMode && (
+                <>
+                  <Button 
+                    size="sm" 
+                    variant="secondary"
+                    onClick={() => setShowClientCreator(!showClientCreator)}
+                    style={{ marginRight: '0.5rem' }}
+                  >
+                    {showClientCreator ? 'Close Client Creator' : 'Create Test Client'}
+                  </Button>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="primary"
+                    onClick={() => setShowTestGenerator(!showTestGenerator)}
+                  >
+                    {showTestGenerator ? 'Close Generator' : 'Generate Test KYC'}
+                  </Button>
+                </>
+              )}
+            </div>
           </HeaderActions>
         </TopBar>
 
         <ContentLayout>
+          {/* Test Client Creator Section */}
+          {testMode && showClientCreator && (
+            <Card style={{ marginBottom: '1.5rem', border: '2px solid #8b5cf6', background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#6b46c1' }}>
+                  👤 Test Client Creator
+                </h2>
+                <p style={{ color: '#6b46c1', fontSize: '0.875rem', margin: 0 }}>
+                  Create test client accounts for KYC testing and development
+                </p>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                {/* Company Selection */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Company *
+                  </label>
+                  <select
+                    value={clientFormData.selectedCompany}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, selectedCompany: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="">{isLoadingCompanies ? 'Loading companies...' : 'Select Company'}</option>
+                    {companiesForFilter.map(company => (
+                      <option key={company.company_id} value={company.company_id}>
+                        {company.company_name} ({company.company_code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* First Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={clientFormData.fname}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, fname: e.target.value }))}
+                    placeholder="John"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                {/* Middle Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Middle Name
+                  </label>
+                  <input
+                    type="text"
+                    value={clientFormData.mname}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, mname: e.target.value }))}
+                    placeholder="Middle"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                {/* Last Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={clientFormData.sname}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, sname: e.target.value }))}
+                    placeholder="Doe"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={clientFormData.email}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="john.doe@example.com"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                {/* Mobile Number */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={clientFormData.mobileno}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, mobileno: e.target.value }))}
+                    placeholder="+1234567890"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                {/* Account Origin Number */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Account Origin Number
+                  </label>
+                  <input
+                    type="text"
+                    value={clientFormData.accountOriginNumber}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, accountOriginNumber: e.target.value }))}
+                    placeholder="AUTO-GENERATED if empty"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                {/* Current Privilege Level */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    Initial Privilege Level
+                  </label>
+                  <select
+                    value={clientFormData.currentPrivilegeLevel}
+                    onChange={(e) => setClientFormData(prev => ({ ...prev, currentPrivilegeLevel: parseInt(e.target.value) }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    {apiMode && privilegeLevels.length > 0 ? (
+                      privilegeLevels.map(privilege => (
+                        <option key={privilege.autoid} value={privilege.privilege_level}>
+                          Level {privilege.privilege_level} - {privilege.privilege_name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value={0}>Level 0 - New User</option>
+                        <option value={1}>Level 1 - Basic Verified</option>
+                        <option value={2}>Level 2 - Enhanced Verified</option>
+                        <option value={3}>Level 3 - Premium Verified</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Additional Metadata */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                  Additional Notes (Account Metadata)
+                </label>
+                <textarea
+                  value={clientFormData.accountMetadata}
+                  onChange={(e) => setClientFormData(prev => ({ ...prev, accountMetadata: e.target.value }))}
+                  placeholder="Additional information or notes about this test client..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <Button
+                  onClick={createTestClient}
+                  disabled={!clientFormData.selectedCompany || isCreatingClient}
+                  style={{
+                    background: isCreatingClient ? '#9ca3af' : '#8b5cf6',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: isCreatingClient ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isCreatingClient ? 'Creating Client...' : 'Create Test Client'}
+                </Button>
+                
+                <Button
+                  onClick={() => setShowClientCreator(false)}
+                  style={{
+                    background: 'transparent',
+                    color: '#6b46c1',
+                    border: '1px solid #6b46c1',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              {/* Client Creator Information */}
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1rem',
+                background: '#8b5cf6',
+                borderRadius: '8px',
+                color: 'white'
+              }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600' }}>
+                  ℹ️ Test Client Creation Process
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.8rem', lineHeight: '1.4' }}>
+                  <li><strong>Phase 2:</strong> Client Account Creation via /api/KYC/clients</li>
+                  <li><strong>ID Generation:</strong> Account Code (CompanyCode + 10 digits) and Account ID (15 digits)</li>
+                  <li><strong>Auto-Generation:</strong> Missing fields will be auto-generated with TEST prefixes</li>
+                  <li><strong>Metadata:</strong> All test clients include test_generated flag and timestamp</li>
+                  <li><strong>Availability:</strong> Created clients immediately available for KYC request generation</li>
+                  <li><strong>Company Required:</strong> Must select a company before creating client</li>
+                  <li><strong>🟢 API Mode:</strong> Real client creation via official endpoints (Always On)</li>
+                </ul>
+              </div>
+            </Card>
+          )}
+
+          {/* Test KYC Generator Section */}
+          {testMode && showTestGenerator && (
+            <Card style={{ marginBottom: '1.5rem', border: '2px solid #fbbf24', background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#92400e' }}>
+                  🧪 Test KYC Request Generator
+                </h2>
+                <p style={{ color: '#b45309', margin: 0 }}>
+                  Generate test KYC requests for development and testing purposes
+                </p>
+              </div>
+
+              <PrivilegeForm>
+                <div className="form-header">
+                  <h3>Generate Test KYC Request</h3>
+                  <p>Create a test KYC request with mock client data and optional file attachments</p>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Company *</label>
+                    <select
+                      value={testFormData.selectedCompany}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, selectedCompany: e.target.value }))}
+                      required
+                    >
+                      <option value="">{isLoadingCompanies ? 'Loading companies...' : 'Select Company'}</option>
+                      {companiesForFilter.map(company => (
+                        <option key={company.company_id} value={company.company_id}>
+                          {company.company_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Client Account ID (Optional)</label>
+                    <input
+                      type="text"
+                      value={testFormData.selectedClient}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, selectedClient: e.target.value }))}
+                      placeholder="Enter existing account ID or leave empty to create new client"
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                      💡 Leave empty to create a new test client, or enter an existing account ID for testing
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Request Type</label>
+                    <select
+                      value={testFormData.requestType}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, requestType: e.target.value }))}
+                    >
+                      <option value="initial_verification">Initial Verification</option>
+                      <option value="level_upgrade">Level Upgrade</option>
+                      <option value="compliance_review">Compliance Review</option>
+                      <option value="document_update">Document Update</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Priority Level</label>
+                    <select
+                      value={testFormData.priorityLevel}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, priorityLevel: parseInt(e.target.value) }))}
+                    >
+                      <option value={1}>Low Priority</option>
+                      <option value={2}>Medium Priority</option>
+                      <option value={3}>High Priority</option>
+                      <option value={4}>Urgent Priority</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Current Level</label>
+                    <select
+                      value={testFormData.currentLevel}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, currentLevel: parseInt(e.target.value) }))}
+                    >
+                      {apiMode && privilegeLevels.length > 0 ? (
+                        privilegeLevels.map(privilege => (
+                          <option key={privilege.autoid} value={privilege.privilege_level}>
+                            Level {privilege.privilege_level} - {privilege.privilege_name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value={0}>Level 0 - Basic</option>
+                          <option value={1}>Level 1 - Bronze</option>
+                          <option value={2}>Level 2 - Silver</option>
+                          <option value={3}>Level 3 - Gold</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Target Level</label>
+                    <select
+                      value={testFormData.targetLevel}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, targetLevel: parseInt(e.target.value) }))}
+                    >
+                      {apiMode && privilegeLevels.length > 0 ? (
+                        privilegeLevels
+                          .filter(privilege => privilege.privilege_level > testFormData.currentLevel)
+                          .map(privilege => (
+                            <option key={privilege.autoid} value={privilege.privilege_level}>
+                              Level {privilege.privilege_level} - {privilege.privilege_name}
+                            </option>
+                          ))
+                      ) : (
+                        <>
+                          <option value={1}>Level 1 - Bronze</option>
+                          <option value={2}>Level 2 - Silver</option>
+                          <option value={3}>Level 3 - Gold</option>
+                          <option value={4}>Level 4 - Platinum</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Request Description</label>
+                    <textarea
+                      value={testFormData.requestDescription}
+                      onChange={(e) => setTestFormData(prev => ({ ...prev, requestDescription: e.target.value }))}
+                      placeholder="Optional description for the test request..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={testFormData.generateFiles}
+                        onChange={(e) => setTestFormData(prev => ({ ...prev, generateFiles: e.target.checked }))}
+                      />
+                      Generate Mock Files
+                    </label>
+                  </div>
+                  {testFormData.generateFiles && (
+                    <div className="form-group">
+                      <label>Number of Files</label>
+                      <select
+                        value={testFormData.fileCount}
+                        onChange={(e) => setTestFormData(prev => ({ ...prev, fileCount: parseInt(e.target.value) }))}
+                      >
+                        <option value={1}>1 file</option>
+                        <option value={2}>2 files</option>
+                        <option value={3}>3 files</option>
+                        <option value={4}>4 files</option>
+                        <option value={5}>5 files</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="form-actions">
+                  <Button 
+                    type="button" 
+                    variant="primary"
+                    onClick={generateTestKYCRequest}
+                    disabled={!testFormData.selectedCompany || isGeneratingTest}
+                  >
+                    {isGeneratingTest ? 'Generating...' : 'Generate Test KYC Request'}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => setShowTestGenerator(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+
+                {/* Test Mode Information */}
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1rem',
+                  background: '#fbbf24',
+                  borderRadius: '8px',
+                  color: '#92400e'
+                }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600' }}>
+                    ℹ️ Official KYC Workflow & ID Patterns
+                  </h4>
+                  <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.8rem', lineHeight: '1.4' }}>
+                    <li><strong>Phase 1:</strong> Company Setup (Completed)</li>
+                    <li><strong>Phase 2:</strong> Client Account Upsert (/api/KYC/clients/create) or Use Existing Account ID</li>
+                    <li><strong>Phase 3:</strong> Token Generation & Secure Link Creation</li>
+                    <li><strong>Phase 4:</strong> Internal KYC Request Creation</li>
+                    <li><strong>Phase 5:</strong> Client Status Tracking (Public API)</li>
+                    <li><strong>Phase 6:</strong> Admin Review & Processing</li>
+                    <br />
+                    <li><strong>ID Patterns:</strong></li>
+                    <li>• KYC Request: KYC + 12 digits (e.g., KYC123456789012)</li>
+                    <li>• Account Code: CompanyCode + 10 digits (e.g., BWC1234567890)</li>
+                    <li>• Account ID: 15 random digits (e.g., 987654321098765)</li>
+                    <li>• Access tokens are secure Base64 encoded (32 bytes)</li>
+                    <br />
+                    <li><strong>🟢 API Mode Active:</strong> Real API calls following official workflow (Always On)</li>
+                    <li><strong>📝 Free Text Entry:</strong> Enter any account ID for testing, or leave empty to create new client</li>
+                  </ul>
+                </div>
+              </PrivilegeForm>
+            </Card>
+          )}
+
           <TabContainer>
             <TabList>
               <TabButton 
@@ -608,11 +1632,14 @@ export default function KYCPage() {
                     onChange={(e) => setSelectedCompany(e.target.value)}
                   >
                     <option value="all">All Companies</option>
-                    {companies.map(company => (
+                    {companiesForFilter.map(company => (
                       <option key={company.company_id} value={company.company_id.toString()}>
                         {company.company_name}
                       </option>
                     ))}
+                    {companiesForFilter.length === 0 && !isLoadingCompanies && (
+                      <option value="" disabled>No companies available</option>
+                    )}
                   </select>
                 </FilterGroup>
 
@@ -686,6 +1713,8 @@ export default function KYCPage() {
                   </h2>
                   <p style={{ color: '#64748b', margin: 0 }}>
                     Manage and review client verification requests ({filteredAndSortedRequests.length} results)
+                    <span style={{ color: '#10b981', marginLeft: '0.5rem' }}>• API Mode Active (Always On)</span>
+                    {isLoading && <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>• Loading...</span>}
                   </p>
                 </div>
 
@@ -708,8 +1737,15 @@ export default function KYCPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAndSortedRequests.map((request) => (
-                      <tr key={request.autoid}>
+                    {filteredAndSortedRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan="12" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                          {isLoading ? 'Loading requests...' : 'No KYC requests found'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAndSortedRequests.map((request) => (
+                        <tr key={request.autoid || request.kyc_request_id || Math.random()}>
                         <td>
                           <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>
                             {request.kyc_request_id}
@@ -718,26 +1754,26 @@ export default function KYCPage() {
                         <td>
                           <div>
                             <div style={{ fontWeight: '600' }}>
-                              {request.client_account.fname} {request.client_account.mname} {request.client_account.sname}
+                              {request.client_account?.fname || 'N/A'} {request.client_account?.mname || ''} {request.client_account?.sname || 'N/A'}
                             </div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              {request.client_account.account_id}
+                              {request.client_account?.account_id || request.client_account?.account_code || 'N/A'}
                             </div>
                           </div>
                         </td>
                         <td>
                           <div>
                             <div style={{ fontWeight: '500' }}>
-                              {request.company.company_name}
+                              {request.company?.company_name || 'N/A'}
                             </div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              {request.company.company_type}
+                              {request.company?.company_type || 'N/A'}
                             </div>
                           </div>
                         </td>
                         <td>
                           <span style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                            {request.client_account.account_code}
+                            {request.client_account?.account_code || request.account_code || 'N/A'}
                           </span>
                         </td>
                         <td>
@@ -812,7 +1848,7 @@ export default function KYCPage() {
                                 <Button 
                                   size="sm" 
                                   variant="secondary"
-                                  onClick={() => handleStatusUpdate(request.kyc_request_id, 2)}
+                                  onClick={() => processKYCRequest(request.kyc_request_id, 4)}
                                   disabled={request.request_status === 3 || request.request_status === 4 || request.request_status === 5}
                                 >
                                   Review
@@ -820,7 +1856,7 @@ export default function KYCPage() {
                                 <Button 
                                   size="sm" 
                                   variant="secondary"
-                                  onClick={() => handleStatusUpdate(request.kyc_request_id, 3)}
+                                  onClick={() => processKYCRequest(request.kyc_request_id, 1)}
                                   disabled={request.request_status === 3 || request.request_status === 5}
                                 >
                                   Approve
@@ -828,7 +1864,7 @@ export default function KYCPage() {
                                 <Button 
                                   size="sm" 
                                   variant="secondary"
-                                  onClick={() => handleStatusUpdate(request.kyc_request_id, 4)}
+                                  onClick={() => processKYCRequest(request.kyc_request_id, 2)}
                                   disabled={request.request_status === 4 || request.request_status === 5}
                                 >
                                   Reject
@@ -838,7 +1874,7 @@ export default function KYCPage() {
                             <Button 
                               size="sm" 
                               variant="ghost"
-                              onClick={() => handleArchiveRequest(request.kyc_request_id)}
+                              onClick={() => processKYCRequest(request.kyc_request_id, 3)}
                               disabled={request.request_status === 5}
                             >
                               Archive
@@ -846,7 +1882,8 @@ export default function KYCPage() {
                           </ActionButtonsContainer>
                         </td>
                       </tr>
-                    ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
                 </Table>
@@ -879,13 +1916,28 @@ export default function KYCPage() {
                 <p style={{ color: '#64748b', margin: 0 }}>
                   Configure company-specific KYC privilege levels and verification requirements
                 </p>
-                <div style={{ marginTop: '1rem' }}>
+                <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <Button 
                     variant="primary" 
                     onClick={() => setShowPrivilegeForm(!showPrivilegeForm)}
                   >
                     {showPrivilegeForm ? 'Cancel' : 'Add New Privilege'}
                   </Button>
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => loadPrivilegeLevels()}
+                    style={{ fontSize: '0.875rem' }}
+                  >
+                    🔄 Refresh Privileges
+                  </Button>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Loaded: {privilegeLevels.length} privilege levels
+                    {privilegeLevels.length > 0 && (
+                      <span style={{ marginLeft: '0.5rem' }}>
+                        | Companies: {[...new Set(privilegeLevels.map(p => p.company_id))].join(', ')}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -900,10 +1952,10 @@ export default function KYCPage() {
                     <div className="form-group">
                       <label>Company</label>
                       <select>
-                        <option value="">Select Company</option>
-                        {companies.map(company => (
+                        <option value="">{isLoadingCompanies ? 'Loading companies...' : 'Select Company'}</option>
+                        {companiesForFilter.map(company => (
                           <option key={company.company_id} value={company.company_id}>
-                            {company.company_name}
+                            {company.company_name} ({company.company_code})
                           </option>
                         ))}
                       </select>
@@ -951,8 +2003,8 @@ export default function KYCPage() {
               )}
 
               <SettingsGrid>
-                {companies.map(company => {
-                  const companyPrivileges = kycPrivileges.filter(p => p.company_id === company.company_id);
+                {companiesForFilter.map(company => {
+                  const companyPrivileges = privilegeLevels.filter(p => p.company_id === company.company_id);
                   
                   return (
                     <PrivilegeCard key={company.company_id}>

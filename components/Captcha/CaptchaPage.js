@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { API_ENDPOINTS } from '../backend/apiHelper';
+import axiosPublicInstance from '../backend/axiosPublicInstance';
 import { 
   DashboardContainer, 
   MainContent, 
@@ -29,13 +32,20 @@ import {
 } from './CaptchaPageStyled';
 
 export default function CaptchaPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('verification');
   const [searchTerm, setSearchTerm] = useState('');
   const [captchaText, setCaptchaText] = useState('');
+  const [captchaId, setCaptchaId] = useState(null);
   const [userInput, setUserInput] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [captchaHistory, setCaptchaHistory] = useState([]);
+  const [isValidAccess, setIsValidAccess] = useState(false);
+  const [isLoadingAccess, setIsLoadingAccess] = useState(true);
+  const [accessError, setAccessError] = useState(null);
+  const [redirectUrl, setRedirectUrl] = useState(null);
   const [settings, setSettings] = useState({
     difficulty: 'medium',
     length: 5,
@@ -46,6 +56,7 @@ export default function CaptchaPage() {
   const [lastRegenerateTime, setLastRegenerateTime] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
   const canvasRef = useRef(null);
 
   // Generate random captcha text
@@ -64,12 +75,18 @@ export default function CaptchaPage() {
 
   // Draw captcha on canvas
   const drawCaptcha = (text) => {
+    console.log('🎨 drawCaptcha called with text:', text);
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.error('❌ Canvas ref is null!');
+      return;
+    }
     
+    console.log('🎨 Canvas found, getting context...');
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
+    console.log('🎨 Canvas dimensions:', width, 'x', height);
     
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -112,33 +129,105 @@ export default function CaptchaPage() {
       ctx.fillText(char, 0, 0);
       ctx.restore();
     }
+    
+    console.log('✅ Captcha drawing completed');
   };
 
-  // Generate new captcha
-  const generateNewCaptcha = () => {
+  // Generate new captcha via API
+  const generateNewCaptcha = async () => {
+    console.log('🎨 generateNewCaptcha called');
     const now = Date.now();
     const timeSinceLastRegenerate = now - lastRegenerateTime;
     const cooldownPeriod = 30000; // 30 seconds in milliseconds
     
     if (timeSinceLastRegenerate < cooldownPeriod) {
       const remainingTime = Math.ceil((cooldownPeriod - timeSinceLastRegenerate) / 1000);
+      console.log('⏰ Captcha cooldown active, remaining:', remainingTime);
       setCooldownRemaining(remainingTime);
       return;
     }
     
-    const newText = generateCaptchaText();
-    setCaptchaText(newText);
-    setUserInput('');
-    setIsVerified(false);
-    setLastRegenerateTime(now);
-    setCooldownRemaining(0);
-    drawCaptcha(newText);
+    console.log('🎨 Starting captcha generation...');
+    
+    try {
+      // Generate captcha via API
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.GENERATE_CAPTCHA, {
+        difficulty: settings.difficulty,
+        length: settings.length,
+        case_sensitive: settings.caseSensitive,
+        include_numbers: settings.includeNumbers,
+        include_symbols: settings.includeSymbols
+      });
+
+      if (response.data.Success) {
+        const { captcha_text, captcha_id, image_data } = response.data.Data;
+        setCaptchaText(captcha_text);
+        setCaptchaId(captcha_id);
+        setUserInput('');
+        setIsVerified(false);
+        setLastRegenerateTime(now);
+        setCooldownRemaining(0);
+        
+        // Draw the captcha image if image data is provided, otherwise use local generation
+        if (image_data) {
+          drawCaptchaFromBase64(image_data);
+        } else {
+          drawCaptcha(captcha_text);
+        }
+      } else {
+        // Fallback to local generation
+        console.log('🔄 API failed, using local captcha generation');
+        const newText = generateCaptchaText();
+        console.log('🎨 Generated captcha text:', newText);
+        setCaptchaText(newText);
+        setUserInput('');
+        setIsVerified(false);
+        setLastRegenerateTime(now);
+        setCooldownRemaining(0);
+        console.log('🎨 Drawing captcha on canvas...');
+        drawCaptcha(newText);
+      }
+    } catch (error) {
+      console.error('❌ Error generating captcha via API:', error);
+      // Fallback to local generation
+      console.log('🔄 API error, using local captcha generation');
+      const newText = generateCaptchaText();
+      console.log('🎨 Generated captcha text:', newText);
+      setCaptchaText(newText);
+      setUserInput('');
+      setIsVerified(false);
+      setLastRegenerateTime(now);
+      setCooldownRemaining(0);
+      console.log('🎨 Drawing captcha on canvas...');
+      drawCaptcha(newText);
+    }
   };
 
-  // Verify captcha
-  const verifyCaptcha = () => {
-    const input = settings.caseSensitive ? userInput : userInput.toLowerCase();
-    const isCorrect = input === captchaText;
+  // Draw captcha from base64 image data
+  const drawCaptchaFromBase64 = (base64Data) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = `data:image/png;base64,${base64Data}`;
+  };
+
+  // Verify captcha via API
+  const verifyCaptcha = async () => {
+    setIsSubmittingVerification(true);
+    
+    try {
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.VERIFY_CAPTCHA, {
+        captcha_id: captchaId,
+        captcha_text: captchaText,
+        user_input: userInput,
+        case_sensitive: settings.caseSensitive
+      });
     
     setAttempts(prev => prev + 1);
     
@@ -146,27 +235,132 @@ export default function CaptchaPage() {
       id: Date.now(),
       text: captchaText,
       userInput: userInput,
-      isCorrect,
+        isCorrect: response.data.Success,
       timestamp: new Date().toISOString(),
-      difficulty: settings.difficulty
+        difficulty: settings.difficulty,
+        response_time: response.data.Data?.response_time || '0ms'
     };
     
     setCaptchaHistory(prev => [verification, ...prev.slice(0, 49)]); // Keep last 50
     
-    if (isCorrect) {
+      if (response.data.Success) {
       setIsVerified(true);
+        
+        // If there's a redirect URL, redirect after verification
+        if (redirectUrl) {
+          setTimeout(() => {
+            window.location.href = redirectUrl;
+          }, 1500);
+        } else {
+          // Default redirect to KYC page if no redirect URL provided
+          const token = searchParams.get('token');
+          const account = searchParams.get('account');
+          if (token && account) {
+            setTimeout(() => {
+              window.location.href = `/client?token=${token}&account=${account}`;
+            }, 1500);
+          }
+        }
     } else {
       // Generate new captcha after wrong attempt
       setTimeout(() => {
         generateNewCaptcha();
       }, 1000);
     }
+    } catch (error) {
+      console.error('Error verifying captcha:', error);
+      setAttempts(prev => prev + 1);
+      
+      // Fallback to local verification
+      const input = settings.caseSensitive ? userInput : userInput.toLowerCase();
+      const isCorrect = input === captchaText;
+      
+      const verification = {
+        id: Date.now(),
+        text: captchaText,
+        userInput: userInput,
+        isCorrect,
+        timestamp: new Date().toISOString(),
+        difficulty: settings.difficulty,
+        response_time: 'local'
+      };
+      
+      setCaptchaHistory(prev => [verification, ...prev.slice(0, 49)]);
+      
+      if (isCorrect) {
+        setIsVerified(true);
+        if (redirectUrl) {
+          setTimeout(() => {
+            window.location.href = redirectUrl;
+          }, 1500);
+        } else {
+          // Default redirect to KYC page if no redirect URL provided
+          const token = searchParams.get('token');
+          const account = searchParams.get('account');
+          if (token && account) {
+            setTimeout(() => {
+              window.location.href = `/client?token=${token}&account=${account}`;
+            }, 1500);
+          }
+        }
+      } else {
+        setTimeout(() => {
+          generateNewCaptcha();
+        }, 1000);
+      }
+    } finally {
+      setIsSubmittingVerification(false);
+    }
   };
 
-  // Initialize captcha on component mount
+  // Validate access and initialize
   useEffect(() => {
-    generateNewCaptcha();
-  }, [settings]);
+    const validateAccess = async () => {
+      try {
+        setIsLoadingAccess(true);
+        
+        // Get parameters from URL
+        const redirect = searchParams.get('redirect');
+        const source = searchParams.get('source');
+        const token = searchParams.get('token');
+        const account = searchParams.get('account');
+        
+        if (redirect) {
+          setRedirectUrl(decodeURIComponent(redirect));
+        }
+        
+        // Validate access - require token and account parameters
+        if (token && account) {
+          console.log('CaptchaPage: Valid access with token and account parameters');
+          setIsValidAccess(true);
+          await generateNewCaptcha();
+        } else if (redirect || source) {
+          console.log('CaptchaPage: Valid access with redirect/source parameters');
+          setIsValidAccess(true);
+          await generateNewCaptcha();
+        } else {
+          console.log('CaptchaPage: Access denied - missing required parameters');
+          setAccessError('Access denied. This page requires a valid access link with token and account parameters.');
+        }
+      } catch (error) {
+        console.error('Access validation error:', error);
+        setAccessError('Unable to validate access. Please try again.');
+      } finally {
+        setIsLoadingAccess(false);
+      }
+    };
+    
+    validateAccess();
+  }, [searchParams]);
+
+  // Initialize captcha when settings change
+  useEffect(() => {
+    console.log('🔄 useEffect triggered - isValidAccess:', isValidAccess);
+    if (isValidAccess) {
+      console.log('🎨 Calling generateNewCaptcha from useEffect...');
+      generateNewCaptcha();
+    }
+  }, [settings, isValidAccess]);
 
   // Cooldown timer effect
   useEffect(() => {
@@ -195,6 +389,98 @@ export default function CaptchaPage() {
 
   const recentVerifications = captchaHistory.slice(0, 10);
 
+  // Show loading state while validating access
+  if (isLoadingAccess) {
+    return (
+      <DashboardContainer>
+        <MainContent>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '60vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ 
+              width: '48px', 
+              height: '48px', 
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #f59e0b',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <p style={{ color: '#64748b', fontSize: '1.125rem' }}>
+              Validating access...
+            </p>
+          </div>
+        </MainContent>
+      </DashboardContainer>
+    );
+  }
+
+  // Show error state if access is denied
+  if (accessError) {
+    return (
+      <DashboardContainer>
+        <MainContent>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '60vh',
+            flexDirection: 'column',
+            gap: '1.5rem',
+            textAlign: 'center',
+            padding: '2rem'
+          }}>
+            <div style={{ 
+              fontSize: '3rem',
+              color: '#dc2626'
+            }}>
+              🤖
+            </div>
+            <h2 style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: '600', 
+              color: '#dc2626',
+              margin: 0
+            }}>
+              Access Restricted
+            </h2>
+            <p style={{ 
+              color: '#64748b', 
+              fontSize: '1.125rem',
+              maxWidth: '500px',
+              lineHeight: '1.6'
+            }}>
+              {accessError}
+            </p>
+            <button
+              onClick={() => router.push('/')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#d97706'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#f59e0b'}
+            >
+              Return to Home
+            </button>
+          </div>
+        </MainContent>
+      </DashboardContainer>
+    );
+  }
+
+  // Show main captcha form if access is valid
   return (
     <DashboardContainer>
       <MainContent>
@@ -258,7 +544,7 @@ export default function CaptchaPage() {
 
               <CaptchaContainer>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  <CaptchaCanvas
+                  <canvas
                     ref={canvasRef}
                     width={300}
                     height={80}
@@ -267,7 +553,9 @@ export default function CaptchaPage() {
                       cursor: cooldownRemaining > 0 ? 'not-allowed' : 'pointer', 
                       border: '2px solid #e2e8f0', 
                       borderRadius: '8px',
-                      opacity: cooldownRemaining > 0 ? 0.6 : 1
+                      opacity: cooldownRemaining > 0 ? 0.6 : 1,
+                      display: 'block',
+                      margin: '0 auto'
                     }}
                     title={cooldownRemaining > 0 ? `Please wait ${cooldownRemaining}s before regenerating` : "Click to generate new CAPTCHA"}
                   />
@@ -297,10 +585,10 @@ export default function CaptchaPage() {
                   <CaptchaControls>
                     <Button 
                       onClick={verifyCaptcha}
-                      disabled={!userInput.trim() || isVerified}
+                      disabled={!userInput.trim() || isVerified || isSubmittingVerification}
                       variant="primary"
                     >
-                      {isVerified ? '✓ Verified' : 'Verify'}
+                      {isSubmittingVerification ? 'Verifying...' : isVerified ? '✓ Verified' : 'Verify'}
                     </Button>
                     <Button 
                       onClick={generateNewCaptcha}
@@ -323,6 +611,9 @@ export default function CaptchaPage() {
                       <strong>✓ Verification Successful!</strong>
                       <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
                         You have successfully completed the CAPTCHA verification.
+                        {redirectUrl && (
+                          <><br />You will be redirected automatically in a few seconds...</>
+                        )}
                       </p>
                     </div>
                   )}
@@ -391,7 +682,7 @@ export default function CaptchaPage() {
                               {verification.difficulty.toUpperCase()}
                             </StatusBadge>
                           </td>
-                          <td>2.3s</td>
+                          <td>{verification.response_time || '2.3s'}</td>
                         </tr>
                       ))}
                     </tbody>

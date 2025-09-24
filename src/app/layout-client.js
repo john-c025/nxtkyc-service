@@ -9,12 +9,14 @@ export default function ClientLayout({ children }) {
   const pathname = usePathname();
   const { isExpiring, isExpired, countdown } = useJWTChecker();
 
-  // Don't show JWT-related UI on login pages
+  // Don't show JWT-related UI on login pages and public pages
   const isLoginPage = pathname === '/' || pathname === '/login';
+  const isPublicPage = pathname.startsWith('/client') || pathname.startsWith('/captcha');
+  const shouldSkipJWTChecks = isLoginPage || isPublicPage;
 
   return (
     <ThemeProvider>
-      {isExpired && !isLoginPage ? (
+      {isExpired && !shouldSkipJWTChecks ? (
         <div className="fixed inset-0 bg-gray-900 flex h-screen items-center justify-center">
           <div className="text-center">
             <div className="mb-4 text-red-500">
@@ -42,7 +44,7 @@ export default function ClientLayout({ children }) {
         </div>
       ) : (
         <>
-          {isExpiring && !isLoginPage && <SessionExpiryModal countdown={countdown} />}
+          {isExpiring && !shouldSkipJWTChecks && <SessionExpiryModal countdown={countdown} />}
           {children}
         </>
       )}

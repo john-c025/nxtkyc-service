@@ -3,15 +3,25 @@
 import { useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
 import { jwtDecode } from "jwt-decode";
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export function useJWTChecker() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isExpiring, setIsExpiring] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
+    // Skip JWT checks on public pages and login pages
+    const isLoginPage = pathname === '/' || pathname === '/login';
+    const isPublicPage = pathname.startsWith('/client') || pathname.startsWith('/captcha');
+    
+    if (isLoginPage || isPublicPage) {
+      console.log('🔍 JWT Checker: Skipping JWT checks on public/login page:', pathname);
+      return;
+    }
+
     const checkToken = () => {
       console.log('🔍 JWT Checker: Running token check...');
       const token = Cookies.get('authToken');
@@ -73,7 +83,7 @@ export function useJWTChecker() {
     const interval = setInterval(checkToken, 5000);
 
     return () => clearInterval(interval);
-  }, [router]);
+  }, [router, pathname]);
 
   return { isExpiring, isExpired, countdown };
 }

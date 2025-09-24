@@ -15,9 +15,9 @@ export const metadata = {
   title: 'NXTKYC ',
   description: 'NXTKYC - KYC Verification System',
   icons: {
-    icon: '/assets/logo-only.png',
-    shortcut: '/assets/logo-only.png',
-    apple: '/assets/logo-only.png',
+    icon: '/assets/logo-icon.png',
+    shortcut: '/assets/logo-icon.png',
+    apple: '/assets/logo-icon.png',
   },
 };
 

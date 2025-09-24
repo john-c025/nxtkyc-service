@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { keyframes } from '@emotion/react';
+import { API_ENDPOINTS } from '../backend/apiHelper';
+import axiosPublicInstance from '../backend/axiosPublicInstance';
 import { 
   DashboardContainer, 
   MainContent, 
@@ -48,9 +51,26 @@ const fadeInUp = keyframes`
   }
 `;
 
+const spinAnimation = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
 export default function ClientKYCPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState([]);
+  const [isValidToken, setIsValidToken] = useState(false);
+  const [isLoadingToken, setIsLoadingToken] = useState(true);
+  const [tokenError, setTokenError] = useState(null);
+  const [accessToken, setAccessToken] = useState(null);
+  const [accountCode, setAccountCode] = useState(null);
+  const [submissionRequirements, setSubmissionRequirements] = useState(null);
+  const [privilegeLevels, setPrivilegeLevels] = useState([]);
+  const [enhancedPrivileges, setEnhancedPrivileges] = useState([]);
+  const [fileCategories, setFileCategories] = useState([]);
+  const [companyInfo, setCompanyInfo] = useState(null);
   const [formData, setFormData] = useState({
     // Personal Information (matching client_accounts table exactly)
     fname: '',
@@ -63,22 +83,15 @@ export default function ClientKYCPage() {
     dateOfBirth: '',
     nationality: '',
     
-    // Address Information (stored in account_metadata as JSON)
-    address: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: '',
-    
     // Identity Documents (stored in account_metadata as JSON)
     identityType: '',
     identityNumber: '',
     identityExpiry: '',
     identityDocument: null,
+    identityDocumentCategory: '',
     
     // Address Verification (stored in account_metadata as JSON)
-    addressDocument: null,
-    addressDocumentType: '',
+    // Address document requirement removed
     
     // Simplified form - removed financial and compliance sections
     
@@ -111,35 +124,289 @@ export default function ClientKYCPage() {
    const [submitStatus, setSubmitStatus] = useState(null);
    const [sidebarOpen, setSidebarOpen] = useState(false);
 
-   // Company name - this will be dynamically set based on the client company using the service
-   const companyName = "Blooms Wellness"; // TODO: Make this dynamic based on company_id or auth context
+   // Company name - dynamically loaded from company information
+   const companyName = companyInfo?.company_name || "Loading...";
 
-  const steps = [
-    {
-      id: 1,
+  // Token validation and initialization
+  useEffect(() => {
+    const validateTokenAndInitialize = async () => {
+      try {
+        setIsLoadingToken(true);
+        
+        // Get token and account code from URL parameters
+        const token = searchParams.get('token');
+        const account = searchParams.get('account');
+        
+        if (!token || !account) {
+          setTokenError('Missing access token or account code. Please use the link provided in your email.');
+          setIsLoadingToken(false);
+          return;
+        }
+        
+        setAccessToken(token);
+        setAccountCode(account);
+        
+        // Store token and account for use in catch block
+        const currentToken = token;
+        const currentAccount = account;
+        
+        // Load submission requirements
+        const requirementsResponse = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_REQUIREMENTS);
+        if (requirementsResponse.data.success) {
+          setSubmissionRequirements(requirementsResponse.data.data);
+        }
+        
+        // Step 1: Get company information by account code
+        console.log('🏢 Getting company information for account:', account);
+        const companyResponse = await axiosPublicInstance.get(`${API_ENDPOINTS.KYC_PUBLIC_GET_COMPANY_BY_ACCOUNT}?account_code=${account}`);
+        if (companyResponse.data.success) {
+          const companyData = companyResponse.data.data;
+          setCompanyInfo(companyData);
+          console.log('✅ Company information loaded:', companyData);
+          
+          // Update form data with company information
+          setFormData(prev => ({
+            ...prev,
+            company_id: companyData.company_id,
+            account_code: companyData.account_info.account_code,
+            current_privilege_level: companyData.account_info.current_privilege_level || 0,
+            level_to_upgrade_to: (companyData.account_info.current_privilege_level || 0) + 1
+          }));
+          
+          // Step 2: Load privilege levels using the actual company ID
+          console.log('🎯 Loading privilege levels for company ID:', companyData.company_id);
+          const privilegeLevelsResponse = await axiosPublicInstance.get(`${API_ENDPOINTS.KYC_PUBLIC_PRIVILEGE_LEVELS}/${companyData.company_id}`);
+          if (privilegeLevelsResponse.data.success) {
+            setPrivilegeLevels(privilegeLevelsResponse.data.data);
+            
+            // Process enhanced privilege structure (already in the correct format)
+            const enhancedData = privilegeLevelsResponse.data.data.map(privilege => ({
+              level: privilege.level,
+              name: privilege.name,
+              description: privilege.description,
+              services: privilege.services || [],
+              limits: privilege.limits || {},
+              requirements: privilege.requirements || [],
+              is_active: privilege.is_active
+            }));
+            
+            setEnhancedPrivileges(enhancedData);
+            console.log('✅ Enhanced privileges loaded:', enhancedData);
+            
+            // Generate dynamic steps based on the target privilege level
+            const targetLevel = companyData.account_info.current_privilege_level + 1;
+            const generatedSteps = generateDynamicSteps(enhancedData, targetLevel);
+            setDynamicSteps(generatedSteps);
+            console.log('🎯 Generated dynamic steps for level', targetLevel, ':', generatedSteps);
+          } else {
+            console.error('❌ Failed to load privilege levels:', privilegeLevelsResponse.data);
+          }
+        } else {
+          console.error('❌ Failed to load company information:', companyResponse.data);
+          throw new Error('Unable to load company information. Please check your account code.');
+        }
+        
+        // Load file categories for file uploads
+        const fileCategoriesResponse = await axiosPublicInstance.get(API_ENDPOINTS.KYC_GET_PUBLIC_FILE_CATEGORIES);
+        if (fileCategoriesResponse.data.success) {
+          setFileCategories(fileCategoriesResponse.data.data);
+        }
+        
+        // Phase 2: Token Validation (NEW API)
+        // This follows the official workflow documentation
+        console.log('🔍 Starting token validation process...');
+        console.log('🔍 Token validation endpoint:', API_ENDPOINTS.KYC_VALIDATE_TOKEN);
+        console.log('🔍 Full token:', token);
+        console.log('🔍 Account code:', account);
+        
+        let tokenValidationSuccess = false;
+        
+        try {
+          console.log('📡 Making API call to validate token...');
+          console.log('📡 Request payload:', { token, account_code: account });
+          console.log('📡 Full URL:', `${process.env.NEXT_PUBLIC_API_BASE_URL}/public/kyc/tokens/validate`);
+          
+          const tokenValidationResponse = await axiosPublicInstance.post(API_ENDPOINTS.KYC_VALIDATE_TOKEN, {
+            token: token,
+            account_code: account
+          });
+          
+          console.log('✅ API call completed successfully');
+          console.log('Token validation response:', tokenValidationResponse.data);
+          console.log('Token validation response structure:', {
+            success: tokenValidationResponse.data.success,
+            data: tokenValidationResponse.data.data,
+            is_valid: tokenValidationResponse.data.data?.is_valid
+          });
+          
+          if (tokenValidationResponse.data.success && tokenValidationResponse.data.data.is_valid) {
+            console.log('✅ Token validated successfully:', tokenValidationResponse.data.data);
+            tokenValidationSuccess = true;
+            
+            // Update form data with the validated account information (company info already loaded above)
+            setFormData(prev => ({
+              ...prev,
+              account_code: tokenValidationResponse.data.data.account_code,
+              current_privilege_level: tokenValidationResponse.data.data.current_privilege_level || 0,
+              level_to_upgrade_to: (tokenValidationResponse.data.data.current_privilege_level || 0) + 1 // Target the next level
+            }));
+            
+            // Store token expiration info for UI display
+            if (tokenValidationResponse.data.data.expires_at) {
+              console.log('Token expires at:', tokenValidationResponse.data.data.expires_at);
+            }
+          } else {
+            console.error('❌ Token validation failed - invalid response:', tokenValidationResponse.data);
+            throw new Error(`Token validation failed: ${tokenValidationResponse.data.message || 'Invalid token'}`);
+          }
+        } catch (tokenError) {
+          console.error('❌ Token validation failed:', tokenError);
+          console.error('❌ Token validation error details:', {
+            message: tokenError.message,
+            response: tokenError.response?.data,
+            status: tokenError.response?.status,
+            url: tokenError.config?.url,
+            method: tokenError.config?.method
+          });
+          
+          // Check if it's a network error or API error
+          if (tokenError.code === 'NETWORK_ERROR' || tokenError.message.includes('Network Error')) {
+            console.error('🌐 Network error - API endpoint might not be available');
+          } else if (tokenError.response?.status === 404) {
+            console.error('🔍 404 Error - API endpoint not found');
+          } else if (tokenError.response?.status === 500) {
+            console.error('🔍 500 Error - Server error');
+          }
+          
+          // Token validation failed - this should block access
+          console.error('🚫 Token validation failed - access denied');
+          throw new Error('Invalid or expired access token. Please request a new link.');
+        }
+        
+        // Only proceed if token validation was successful
+        if (!tokenValidationSuccess) {
+          throw new Error('Token validation failed');
+        }
+        
+        setIsValidToken(true);
+      } catch (error) {
+        console.error('Token validation error:', error);
+        
+        // Check if we're in development mode and should allow test access
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        // const allowTestMode = isDevelopment && (currentToken && currentAccount);
+        
+        // if (allowTestMode) {
+        //   console.warn('⚠️ Development mode: Allowing test access without token validation');
+        //   console.log('Setting form data with provided account code for testing...');
+          
+        //   // Set form data with the provided account information for testing
+        //   setFormData(prev => ({
+        //     ...prev,
+        //     account_code: currentAccount,
+        //     company_id: 1, // Default company for testing
+        //     current_privilege_level: 0, // Default level 0
+        //     level_to_upgrade_to: 1 // Target level 1
+        //   }));
+          
+        //   setIsValidToken(true);
+        // } else {
+        //   setTokenError('Invalid or expired access token. Please request a new link.');
+        // }
+      } finally {
+        setIsLoadingToken(false);
+      }
+    };
+    
+    validateTokenAndInitialize();
+  }, [searchParams]);
+
+  // Dynamic steps will be generated based on privilege requirements
+  const [dynamicSteps, setDynamicSteps] = useState([]);
+
+  // Generate dynamic steps based on privilege requirements
+  const generateDynamicSteps = (privileges, targetLevel) => {
+    const targetPrivilege = privileges.find(p => p.level === targetLevel);
+    if (!targetPrivilege || !targetPrivilege.requirements) {
+      return [];
+    }
+
+    const steps = [];
+    let stepId = 1;
+
+    // Always include Personal Information as step 1
+    steps.push({
+      id: stepId++,
       title: 'Personal Information',
       description: 'Basic personal details and contact information',
-      icon: '👤'
-    },
-    {
-      id: 2,
-      title: 'Address Verification',
-      description: 'Residential address and proof of residence',
-      icon: '🏠'
-    },
-    {
-      id: 3,
-      title: 'Identity Verification',
-      description: 'Government-issued ID and verification documents',
-      icon: '🆔'
-    },
-    {
-      id: 4,
+      icon: '👤',
+      type: 'personal_info',
+      required: true
+    });
+
+    // Generate steps based on requirements
+    const requirements = targetPrivilege.requirements;
+    
+    // Group requirements by type
+    const requirementGroups = {
+      'valid_id': {
+        title: 'Identity Verification',
+        description: 'Government-issued ID and verification documents',
+        icon: '🆔',
+        type: 'identity_verification'
+      },
+      'address_proof': {
+        title: 'Address Verification',
+        description: 'Proof of residential address',
+        icon: '🏠',
+        type: 'address_verification'
+      },
+      'income_proof': {
+        title: 'Income Verification',
+        description: 'Proof of income and financial status',
+        icon: '💰',
+        type: 'income_verification'
+      },
+      'business_documents': {
+        title: 'Business Documents',
+        description: 'Business registration and related documents',
+        icon: '🏢',
+        type: 'business_documents'
+      },
+      'additional_documents': {
+        title: 'Additional Documents',
+        description: 'Additional verification documents as required',
+        icon: '📄',
+        type: 'additional_documents'
+      }
+    };
+
+    // Add steps for each requirement type
+    Object.keys(requirementGroups).forEach(reqType => {
+      const hasRequirement = requirements.some(req => req.type === reqType);
+      if (hasRequirement) {
+        const reqDetails = requirements.filter(req => req.type === reqType);
+        steps.push({
+          id: stepId++,
+          ...requirementGroups[reqType],
+          requirements: reqDetails,
+          required: true
+        });
+      }
+    });
+
+    // Always add Review & Submit as the final step
+    steps.push({
+      id: stepId++,
       title: 'Review & Submit',
       description: 'Review all information and submit for verification',
-      icon: '📋'
-    }
-  ];
+      icon: '📋',
+      type: 'review_submit',
+      required: true
+    });
+
+    return steps;
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -171,18 +438,34 @@ export default function ClientKYCPage() {
   };
 
   const validateStep = (stepNumber) => {
-    switch (stepNumber) {
-      case 1:
+    const step = dynamicSteps.find(s => s.id === stepNumber);
+    if (!step) return false;
+
+    switch (step.type) {
+      case 'personal_info':
         return formData.fname && formData.sname && formData.email && 
                formData.mobileno && formData.dateOfBirth && formData.nationality;
-      case 2:
-        return formData.address && formData.city && formData.state && 
-               formData.postalCode && formData.country && formData.addressDocument;
-      case 3:
+      
+      case 'identity_verification':
         return formData.identityType && formData.identityNumber && 
                formData.identityExpiry && formData.identityDocument;
-      case 4:
+      
+      case 'address_verification':
+        return formData.address && formData.city && formData.state && 
+               formData.postalCode && formData.country && formData.addressDocument;
+      
+      case 'income_verification':
+        return formData.incomeProof && formData.incomeAmount;
+      
+      case 'business_documents':
+        return formData.businessRegistration && formData.businessPermit;
+      
+      case 'additional_documents':
+        return formData.additionalDocuments && formData.additionalDocuments.length > 0;
+      
+      case 'review_submit':
         return formData.termsAccepted && formData.privacyAccepted;
+      
       default:
         return false;
     }
@@ -191,7 +474,7 @@ export default function ClientKYCPage() {
   const nextStep = () => {
     if (validateStep(currentStep)) {
       setCompletedSteps(prev => [...prev, currentStep]);
-      setCurrentStep(prev => Math.min(prev + 1, steps.length));
+      setCurrentStep(prev => Math.min(prev + 1, dynamicSteps.length));
     }
   };
 
@@ -208,25 +491,28 @@ export default function ClientKYCPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Generate unique identifiers
-      const timestamp = Date.now();
-      const kycRequestId = `KYC-${new Date().getFullYear()}-${String(timestamp).slice(-6)}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-      const accountCode = `ACC-${timestamp}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-      const accountOriginNumber = `ORIG-${timestamp}`;
-      const accountId = `CLIENT-${timestamp}`;
+      // Prepare FormData for file upload
+      const formDataToSubmit = new FormData();
+      
+      // Add access token and account code
+      formDataToSubmit.append('access_token', accessToken);
+      formDataToSubmit.append('account_code', accountCode);
+      
+      // Add basic request information
+      formDataToSubmit.append('request_type', formData.request_type);
+      formDataToSubmit.append('priority_level', formData.priority_level);
+      formDataToSubmit.append('level_to_upgrade_to', formData.level_to_upgrade_to);
       
       // Prepare account metadata JSON (storing additional info in account_metadata field)
       const accountMetadata = {
         personal_info: {
+          fname: formData.fname,
+          mname: formData.mname,
+          sname: formData.sname,
+          email: formData.email,
+          mobileno: formData.mobileno,
           dateOfBirth: formData.dateOfBirth,
           nationality: formData.nationality
-        },
-        address_info: {
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          postalCode: formData.postalCode,
-          country: formData.country
         },
         identity_info: {
           identityType: formData.identityType,
@@ -240,81 +526,61 @@ export default function ClientKYCPage() {
         }
       };
 
-      // Prepare data for API submission matching database schema exactly
-      const submissionData = {
-        // Client Account Data (client_accounts table)
-        client_account: {
-          company_id: formData.company_id,
-          account_code: accountCode,
-          account_origin_number: accountOriginNumber,
-          account_id: accountId,
-          fname: formData.fname,
-          mname: formData.mname,
-          sname: formData.sname,
-          account_status: formData.account_status, // 1 = Active
-          current_privilege_level: formData.current_privilege_level, // 0 = Default
-          account_metadata: JSON.stringify(accountMetadata),
-          is_active: formData.is_active, // true = Active
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          created_by: 'CLIENT',
-          updated_by: 'CLIENT'
+      // Add detailed request description with client data
+      const requestDescription = `KYC Level ${formData.level_to_upgrade_to} upgrade request for ${formData.fname} ${formData.sname}. Client metadata: ${JSON.stringify(accountMetadata)}`;
+      formDataToSubmit.append('request_description', requestDescription);
+      
+      // Add file description
+      formDataToSubmit.append('file_description', 'KYC verification documents uploaded by client');
+      
+      // Add uploaded files
+      uploadedDocuments.forEach((doc, index) => {
+        formDataToSubmit.append('files', doc.file);
+      });
+      
+      console.log('Submitting KYC Request via API:', {
+        access_token: accessToken ? 'PROVIDED' : 'MISSING',
+        account_code: accountCode,
+        request_type: formData.request_type,
+        priority_level: formData.priority_level,
+        level_to_upgrade_to: formData.level_to_upgrade_to,
+        files_count: uploadedDocuments.length,
+        account_metadata: accountMetadata
+      });
+      
+      // Submit KYC request via API
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.KYC_PUBLIC_SUBMIT, formDataToSubmit, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
         },
-        
-        // KYC Request Data (kyc_requests table)
-        kyc_request: {
-          kyc_request_id: kycRequestId,
-          company_id: formData.company_id,
-          client_account_id: null, // Will be set after account creation
-          token_id: null, // Will be generated by system
-          request_type: formData.request_type,
-          request_status: 1, // 1 = Pending
-          priority_level: formData.priority_level, // 2 = Medium
-          request_description: formData.request_description || 'KYC verification request submitted by client',
-          current_level: formData.current_level, // 0 = Default
-          level_to_upgrade_to: formData.level_to_upgrade_to, // 1 = First upgrade
-          has_files: uploadedDocuments.length > 0,
-          is_one_time_only: formData.is_one_time_only, // true = One time only
-          submitted_at: new Date().toISOString(),
-          completed_at: null,
-          archived_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          created_by: 'CLIENT',
-          updated_by: 'CLIENT'
-        },
-        
-        // Media Files Data (kyc_media_files table)
-        media_files: uploadedDocuments.map(doc => ({
-          kyc_request_id: kycRequestId,
-          file_name: doc.name,
-          file_original_name: doc.name,
-          file_type: 1, // 1 = Document type (enum)
-          file_extension: doc.name.split('.').pop(),
-          file_size: doc.size,
-          file_path: '', // Will be set by server after upload
-          file_url: '', // Will be set by server after upload
-          mime_type: doc.type,
-          file_category: 1, // 1 = Document category (enum)
-          file_description: doc.field,
-          is_verified: false, // Default not verified
-          uploaded_at: new Date().toISOString(),
-          uploaded_by: 'CLIENT',
-          verified_at: null,
-          verified_by: null
-        }))
-      };
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log('Upload progress:', percentCompleted + '%');
+        }
+      });
       
-      console.log('Submitting KYC Request with Database Schema Compliance:', submissionData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      if (response.data.success) {
+        console.log('KYC Request submitted successfully:', response.data.data);
       setSubmitStatus('success');
       setCompletedSteps([...steps.map(s => s.id)]);
+        
+        // Store the KYC request ID for potential status checking
+        if (response.data.data.kyc_request_id) {
+          localStorage.setItem('kyc_request_id', response.data.data.kyc_request_id);
+        }
+      } else {
+        throw new Error(response.data.message || 'Failed to submit KYC request');
+      }
     } catch (error) {
       console.error('Error submitting KYC request:', error);
       setSubmitStatus('error');
+      
+      // Handle specific error cases
+      if (error.response?.status === 401) {
+        setTokenError('Access token has expired. Please request a new link.');
+      } else if (error.response?.data?.message) {
+        console.error('API Error:', error.response.data.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -327,6 +593,125 @@ export default function ClientKYCPage() {
     return 'locked';
   };
 
+  // Show loading state while validating token
+  if (isLoadingToken) {
+    return (
+      <DashboardContainer>
+        <MainContent>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '60vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ 
+              width: '48px', 
+              height: '48px', 
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #f59e0b',
+              borderRadius: '50%',
+              animation: `${spinAnimation} 1s linear infinite`
+            }} />
+            <p style={{ color: '#64748b', fontSize: '1.125rem' }}>
+              Validating access token...
+            </p>
+            <div style={{ 
+              fontSize: '0.875rem', 
+              color: '#64748b',
+              textAlign: 'center',
+              marginTop: '1rem'
+            }}>
+              <p>Token: {searchParams.get('token') ? `${searchParams.get('token').substring(0, 20)}...` : 'Missing'}</p>
+              <p>Account: {searchParams.get('account') || 'Missing'}</p>
+            </div>
+          </div>
+        </MainContent>
+      </DashboardContainer>
+    );
+  }
+
+  // Show error state if token is invalid
+  if (tokenError) {
+    return (
+      <DashboardContainer>
+        <MainContent>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '60vh',
+            flexDirection: 'column',
+            gap: '1.5rem',
+            textAlign: 'center',
+            padding: '2rem'
+          }}>
+            <div style={{ 
+              fontSize: '3rem',
+              color: '#dc2626'
+            }}>
+              🚫
+            </div>
+            <h2 style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: '600', 
+              color: '#dc2626',
+              margin: 0
+            }}>
+              Access Denied
+            </h2>
+            <p style={{ 
+              color: '#64748b', 
+              fontSize: '1.125rem',
+              maxWidth: '500px',
+              lineHeight: '1.6'
+            }}>
+              {tokenError}
+            </p>
+            
+            {/* Debug Information */}
+            <div style={{ 
+              background: '#f8fafc', 
+              padding: '1rem', 
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              color: '#64748b',
+              textAlign: 'left',
+              maxWidth: '400px'
+            }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Debug Information:</h4>
+              <p><strong>Token:</strong> {searchParams.get('token') ? `${searchParams.get('token').substring(0, 20)}...` : 'Missing'}</p>
+              <p><strong>Account:</strong> {searchParams.get('account') || 'Missing'}</p>
+              <p><strong>Environment:</strong> {process.env.NODE_ENV}</p>
+              <p><strong>API Base URL:</strong> {process.env.NEXT_PUBLIC_API_BASE_URL}</p>
+            </div>
+            
+            <button
+              onClick={() => router.push('/')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#d97706'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#f59e0b'}
+            >
+              Return to Home
+            </button>
+          </div>
+        </MainContent>
+      </DashboardContainer>
+    );
+  }
+
+  // Show main KYC form if token is valid
   return (
     <DashboardContainer>
       <MainContent>
@@ -339,7 +724,7 @@ export default function ClientKYCPage() {
             </MobileMenuToggle>
             <HeaderTitle>
               <h1>KYC Verification</h1>
-              <p>Complete your Know Your Customer verification process</p>
+              <p>Complete your Know Your Customer verification process </p>
             </HeaderTitle>
           </HeaderContent>
           <HeaderActions>
@@ -389,11 +774,11 @@ export default function ClientKYCPage() {
                   color: '#64748b',
                   whiteSpace: 'nowrap'
                 }}>
-                  Step {currentStep} of {steps.length}
+                  Step {currentStep} of {dynamicSteps.length}
                 </span>
                 <ProgressBar 
-                  progress={(currentStep / steps.length) * 100}
-                  total={steps.length}
+                  progress={(currentStep / dynamicSteps.length) * 100}
+                  total={dynamicSteps.length}
                   current={currentStep}
                 />
               </div>
@@ -437,6 +822,18 @@ export default function ClientKYCPage() {
              }}>
                KYC Verification Service
              </div>
+             {companyInfo && (
+               <div style={{
+                 color: '#64748b',
+                 fontSize: '0.75rem',
+                 marginTop: '0.5rem',
+                 opacity: 0.8
+               }}>
+                 Account: {companyInfo.account_info?.account_code} | 
+                 Current Level: {companyInfo.account_info?.current_privilege_level} | 
+                 Company ID: {companyInfo.company_id}
+               </div>
+             )}
              {/* Enhanced gradient overlay */}
              <div style={{
                position: 'absolute',
@@ -449,10 +846,141 @@ export default function ClientKYCPage() {
              }} />
            </div>
 
+           {/* Enhanced Privilege Information */}
+           {enhancedPrivileges.length > 0 && (
+             <div style={{
+               marginBottom: '2rem',
+               padding: '1.5rem',
+               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.05) 100%)',
+               borderRadius: '16px',
+               border: '2px solid rgba(59, 130, 246, 0.25)',
+               boxShadow: '0 4px 20px rgba(59, 130, 246, 0.15)',
+               animation: `${fadeInUp} 0.6s ease-out`
+             }}>
+               <h3 style={{
+                 color: '#2563eb',
+                 fontSize: '1.25rem',
+                 fontWeight: '700',
+                 marginBottom: '1rem',
+                 textAlign: 'center'
+               }}>
+                 🎯 Target Privilege Level: {formData.level_to_upgrade_to}
+               </h3>
+               
+               {enhancedPrivileges
+                 .filter(p => p.level === formData.level_to_upgrade_to)
+                 .map((privilege, index) => (
+                   <div key={index} style={{ marginBottom: '1rem' }}>
+                     <h4 style={{ 
+                       color: '#1e40af', 
+                       fontSize: '1.125rem', 
+                       fontWeight: '600',
+                       marginBottom: '0.75rem'
+                     }}>
+                       {privilege.name}
+                     </h4>
+                     <p style={{ 
+                       color: '#64748b', 
+                       fontSize: '0.875rem',
+                       marginBottom: '1rem'
+                     }}>
+                       {privilege.description}
+                     </p>
+                     
+                     {/* Services */}
+                     {privilege.services && privilege.services.length > 0 && (
+                       <div style={{ marginBottom: '1rem' }}>
+                         <h5 style={{ 
+                           color: '#374151', 
+                           fontSize: '0.875rem', 
+                           fontWeight: '600',
+                           marginBottom: '0.5rem'
+                         }}>
+                           🚀 Available Services:
+                         </h5>
+                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                           {privilege.services.map((service, idx) => (
+                             <span key={idx} style={{
+                               background: '#dbeafe',
+                               color: '#1e40af',
+                               padding: '0.25rem 0.75rem',
+                               borderRadius: '12px',
+                               fontSize: '0.75rem',
+                               fontWeight: '500'
+                             }}>
+                               {service.replace(/_/g, ' ').toUpperCase()}
+                             </span>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                     
+                     {/* Limits */}
+                     {privilege.limits && Object.keys(privilege.limits).length > 0 && (
+                       <div style={{ marginBottom: '1rem' }}>
+                         <h5 style={{ 
+                           color: '#374151', 
+                           fontSize: '0.875rem', 
+                           fontWeight: '600',
+                           marginBottom: '0.5rem'
+                         }}>
+                           💰 Transaction Limits:
+                         </h5>
+                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                           {Object.entries(privilege.limits).map(([key, value]) => (
+                             <div key={key} style={{
+                               background: '#f8fafc',
+                               padding: '0.5rem',
+                               borderRadius: '8px',
+                               fontSize: '0.75rem'
+                             }}>
+                               <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> ₱{value?.toLocaleString() || 'N/A'}
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                     
+                     {/* Requirements */}
+                     {privilege.requirements && privilege.requirements.length > 0 && (
+                       <div>
+                         <h5 style={{ 
+                           color: '#374151', 
+                           fontSize: '0.875rem', 
+                           fontWeight: '600',
+                           marginBottom: '0.5rem'
+                         }}>
+                           📋 Verification Requirements:
+                         </h5>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                           {privilege.requirements.map((req, idx) => (
+                             <div key={idx} style={{
+                               background: '#f0fdf4',
+                               border: '1px solid #bbf7d0',
+                               padding: '0.75rem',
+                               borderRadius: '8px',
+                               fontSize: '0.75rem'
+                             }}>
+                               <div style={{ fontWeight: '600', color: '#15803d', marginBottom: '0.25rem' }}>
+                                 {req.name} {req.qty > 1 && `(x${req.qty})`}
+                               </div>
+                               <div style={{ color: '#64748b' }}>
+                                 {req.description}
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 ))}
+             </div>
+           )}
+
            <WaterfallContainer>
             {/* Step Indicators */}
             <StepContainer>
-              {steps.map((step) => (
+              {dynamicSteps.map((step) => (
                 <StepIndicator
                   key={step.id}
                   status={getStepStatus(step.id)}
@@ -465,6 +993,16 @@ export default function ClientKYCPage() {
                   <div className="step-info">
                     <h4>{step.title}</h4>
                     <p>{step.description}</p>
+                    {step.requirements && step.requirements.length > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                        {step.requirements.map((req, idx) => (
+                          <span key={idx}>
+                            {req.name} {req.qty > 1 && `(x${req.qty})`}
+                            {idx < step.requirements.length - 1 && ', '}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </StepIndicator>
               ))}
@@ -475,15 +1013,34 @@ export default function ClientKYCPage() {
               <Card>
                 <div style={{ marginBottom: '2rem' }}>
                   <h2 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#0f172a' }}>
-                    {steps[currentStep - 1].title}
+                    {dynamicSteps[currentStep - 1]?.title || 'Loading...'}
                   </h2>
                   <p style={{ color: '#64748b', margin: 0 }}>
-                    {steps[currentStep - 1].description}
+                    {dynamicSteps[currentStep - 1]?.description || 'Please wait...'}
                   </p>
+                  {dynamicSteps[currentStep - 1]?.requirements && (
+                    <div style={{ 
+                      marginTop: '0.5rem', 
+                      padding: '0.75rem', 
+                      background: '#f0f9ff', 
+                      border: '1px solid #bae6fd', 
+                      borderRadius: '8px',
+                      fontSize: '0.875rem'
+                    }}>
+                      <strong>Required Documents:</strong>
+                      <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
+                        {dynamicSteps[currentStep - 1].requirements.map((req, idx) => (
+                          <li key={idx} style={{ marginBottom: '0.25rem' }}>
+                            {req.name} {req.qty > 1 && `(x${req.qty})`} - {req.description}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
-                {/* Step 1: Personal Information */}
-                {currentStep === 1 && (
+                {/* Dynamic Step Content */}
+                {dynamicSteps[currentStep - 1]?.type === 'personal_info' && (
                   <FormSection>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <InputGroup>
@@ -572,99 +1129,8 @@ export default function ClientKYCPage() {
                   </FormSection>
                 )}
 
-                {/* Step 2: Address Verification */}
-                {currentStep === 2 && (
-                  <FormSection>
-                    <InputGroup>
-                      <label>Street Address *</label>
-                      <input
-                        type="text"
-                        value={formData.address}
-                        onChange={(e) => handleInputChange('address', e.target.value)}
-                        placeholder="Enter your street address"
-                      />
-                    </InputGroup>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <InputGroup>
-                        <label>City *</label>
-                        <input
-                          type="text"
-                          value={formData.city}
-                          onChange={(e) => handleInputChange('city', e.target.value)}
-                          placeholder="Enter your city"
-                        />
-                      </InputGroup>
-                      <InputGroup>
-                        <label>State/Province *</label>
-                        <input
-                          type="text"
-                          value={formData.state}
-                          onChange={(e) => handleInputChange('state', e.target.value)}
-                          placeholder="Enter your state"
-                        />
-                      </InputGroup>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <InputGroup>
-                        <label>Postal Code *</label>
-                        <input
-                          type="text"
-                          value={formData.postalCode}
-                          onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                          placeholder="Enter your postal code"
-                        />
-                      </InputGroup>
-                      <InputGroup>
-                        <label>Country *</label>
-                        <select
-                          value={formData.country}
-                          onChange={(e) => handleInputChange('country', e.target.value)}
-                        >
-                          <option value="">Select your country</option>
-                          <option value="US">United States</option>
-                          <option value="CA">Canada</option>
-                          <option value="GB">United Kingdom</option>
-                          <option value="AU">Australia</option>
-                          <option value="DE">Germany</option>
-                          <option value="FR">France</option>
-                          <option value="JP">Japan</option>
-                          <option value="SG">Singapore</option>
-                        </select>
-                      </InputGroup>
-                    </div>
-                    <InputGroup>
-                      <label>Proof of Address Document *</label>
-                      <FileUpload>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file && file.size <= 5 * 1024 * 1024) {
-                              handleFileUpload('addressDocument', file);
-                            } else {
-                              alert('File size must be under 5MB');
-                            }
-                          }}
-                        />
-                        <DocumentUploadArea>
-                          <div style={{ textAlign: 'center' }}>
-                            <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            <p>Click to upload or drag and drop</p>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              PDF, JPG, PNG up to 5MB
-                            </p>
-                          </div>
-                        </DocumentUploadArea>
-                      </FileUpload>
-                    </InputGroup>
-                  </FormSection>
-                )}
-
-                {/* Step 3: Identity Verification */}
-                {currentStep === 3 && (
+                {/* Identity Verification Step */}
+                {dynamicSteps[currentStep - 1]?.type === 'identity_verification' && (
                   <FormSection>
                     <InputGroup>
                       <label>Identity Document Type *</label>
@@ -745,12 +1211,36 @@ export default function ClientKYCPage() {
                           </div>
                         </DocumentUploadArea>
                       </FileUpload>
+                      {fileCategories.length > 0 && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <label style={{ fontSize: '0.875rem', color: '#64748b' }}>File Category:</label>
+                          <select
+                            value={formData.identityDocumentCategory || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, identityDocumentCategory: e.target.value }))}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '0.875rem',
+                              marginTop: '0.25rem'
+                            }}
+                          >
+                            <option value="">Select category...</option>
+                            {fileCategories.map(category => (
+                              <option key={category.id} value={category.id}>
+                                {category.name} - {category.description}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </InputGroup>
                   </FormSection>
                 )}
 
-                {/* Step 4: Review & Submit */}
-                {currentStep === 4 && (
+                {/* Review & Submit Step */}
+                {dynamicSteps[currentStep - 1]?.type === 'review_submit' && (
                   <FormSection>
                     <div style={{ marginBottom: '2rem' }}>
                       <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 1rem 0', color: '#0f172a' }}>
@@ -786,17 +1276,6 @@ export default function ClientKYCPage() {
                       </div>
                     </div>
 
-                    {/* Address Summary */}
-                    <div style={{ marginBottom: '1.5rem' }}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.75rem 0', color: '#0f172a' }}>
-                        Address Information
-                      </h4>
-                      <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', fontSize: '0.875rem' }}>
-                        <p><strong>Address:</strong> {formData.address}</p>
-                        <p><strong>City:</strong> {formData.city}, {formData.state} {formData.postalCode}</p>
-                        <p><strong>Country:</strong> {formData.country}</p>
-                      </div>
-                    </div>
 
                     {/* Identity Verification Summary */}
                     <div style={{ marginBottom: '1.5rem' }}>
@@ -948,7 +1427,7 @@ export default function ClientKYCPage() {
                     Previous
                   </Button>
                   
-                  {currentStep < steps.length ? (
+                  {currentStep < dynamicSteps.length ? (
                     <Button
                       variant="primary"
                       onClick={nextStep}

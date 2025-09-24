@@ -181,7 +181,7 @@ export default function LoginPage() {
               src="/assets/logo_transparent.png" 
               alt="NXTKYC by NextApp Solutions Corp." 
               style={{
-                maxWidth: '500px',
+                maxWidth: '380px',
                 height: 'auto',
                 marginBottom: '1rem'
               }}
