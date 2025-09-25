@@ -71,6 +71,22 @@ export default function ClientKYCPage() {
   const [enhancedPrivileges, setEnhancedPrivileges] = useState([]);
   const [fileCategories, setFileCategories] = useState([]);
   const [companyInfo, setCompanyInfo] = useState(null);
+  const [accountValidation, setAccountValidation] = useState({
+    isValid: false,
+    isLoading: true,
+    error: null,
+    accountExists: false,
+    originNumberUnique: false,
+    accountOriginNumber: null,
+    companyId: 0
+  });
+
+  // Captcha state for mandatory verification
+  const [captchaRequired, setCaptchaRequired] = useState(true);
+  const [captchaText, setCaptchaText] = useState('');
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
+  const [captchaAttempts, setCaptchaAttempts] = useState(0);
   const [formData, setFormData] = useState({
     // Personal Information (matching client_accounts table exactly)
     fname: '',
@@ -127,6 +143,95 @@ export default function ClientKYCPage() {
    // Company name - dynamically loaded from company information
    const companyName = companyInfo?.company_name || "Loading...";
 
+  // Local captcha functions (no API calls)
+  const generateCaptchaText = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 5; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const generateNewCaptcha = () => {
+    const newText = generateCaptchaText();
+    setCaptchaText(newText);
+    setCaptchaInput('');
+    setCaptchaError('');
+  };
+
+  const verifyCaptcha = () => {
+    if (captchaInput === captchaText) {
+      setCaptchaRequired(false);
+      setCaptchaError('');
+    } else {
+      setCaptchaAttempts(prev => prev + 1);
+      setCaptchaError('Incorrect captcha. Please try again.');
+      generateNewCaptcha();
+    }
+  };
+
+  const handleCaptchaKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      verifyCaptcha();
+    }
+  };
+
+  // Initialize captcha on component mount
+  useEffect(() => {
+    if (captchaRequired) {
+      generateNewCaptcha();
+    }
+  }, [captchaRequired]);
+
+  // Account validation function
+  const validateAccountExistence = async (accountCode) => {
+    if (!accountCode) {
+      setAccountValidation(prev => ({
+        ...prev,
+        isLoading: false,
+        error: 'Account code is required',
+        isValid: false
+      }));
+      return false;
+    }
+
+    try {
+      console.log('🔍 Checking account existence for:', accountCode);
+      const response = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_CHECK_ACCOUNT, {
+        params: { account_code: accountCode }
+      });
+
+      if (response.data.success) {
+        const data = response.data.data;
+        console.log('✅ Account validation response:', data);
+        
+        setAccountValidation({
+          isValid: data.account_exists,
+          isLoading: false,
+          error: null,
+          accountExists: data.account_exists,
+          originNumberUnique: data.origin_number_unique,
+          accountOriginNumber: data.account_origin_number,
+          companyId: data.company_id
+        });
+
+        return data.account_exists;
+      } else {
+        throw new Error(response.data.message || 'Account validation failed');
+      }
+    } catch (error) {
+      console.error('❌ Account validation error:', error);
+      setAccountValidation(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Failed to validate account',
+        isValid: false
+      }));
+      return false;
+    }
+  };
+
   // Token validation and initialization
   useEffect(() => {
     const validateTokenAndInitialize = async () => {
@@ -149,6 +254,13 @@ export default function ClientKYCPage() {
         // Store token and account for use in catch block
         const currentToken = token;
         const currentAccount = account;
+
+        // Step 0: Validate account existence first
+        console.log('🔍 Step 0: Validating account existence...');
+        const accountExists = await validateAccountExistence(account);
+        if (!accountExists) {
+          throw new Error('Account not found or invalid. Please check your account code.');
+        }
         
         // Load submission requirements
         const requirementsResponse = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_REQUIREMENTS);
@@ -593,8 +705,8 @@ export default function ClientKYCPage() {
     return 'locked';
   };
 
-  // Show loading state while validating token
-  if (isLoadingToken) {
+  // Show loading state while validating token and account
+  if (isLoadingToken || accountValidation.isLoading) {
     return (
       <DashboardContainer>
         <MainContent>
@@ -615,7 +727,7 @@ export default function ClientKYCPage() {
               animation: `${spinAnimation} 1s linear infinite`
             }} />
             <p style={{ color: '#64748b', fontSize: '1.125rem' }}>
-              Validating access token...
+              {accountValidation.isLoading ? 'Validating account...' : 'Validating access token...'}
             </p>
             <div style={{ 
               fontSize: '0.875rem', 
@@ -626,6 +738,85 @@ export default function ClientKYCPage() {
               <p>Token: {searchParams.get('token') ? `${searchParams.get('token').substring(0, 20)}...` : 'Missing'}</p>
               <p>Account: {searchParams.get('account') || 'Missing'}</p>
             </div>
+          </div>
+        </MainContent>
+      </DashboardContainer>
+    );
+  }
+
+  // Show error state if account validation fails
+  if (accountValidation.error && !accountValidation.isLoading) {
+    return (
+      <DashboardContainer>
+        <MainContent>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '60vh',
+            flexDirection: 'column',
+            gap: '1.5rem',
+            textAlign: 'center',
+            padding: '2rem'
+          }}>
+            <div style={{ 
+              fontSize: '3rem',
+              color: '#dc2626'
+            }}>
+              🚫
+            </div>
+            <h2 style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: '600', 
+              color: '#dc2626',
+              margin: 0
+            }}>
+              Account Validation Failed
+            </h2>
+            <p style={{ 
+              color: '#64748b', 
+              fontSize: '1.125rem',
+              maxWidth: '500px',
+              lineHeight: '1.6'
+            }}>
+              {accountValidation.error}
+            </p>
+            
+            {/* Debug Information */}
+            <div style={{ 
+              background: '#f8fafc', 
+              padding: '1rem', 
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              color: '#64748b',
+              textAlign: 'left',
+              maxWidth: '400px'
+            }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Debug Information:</h4>
+              <p><strong>Account Code:</strong> {searchParams.get('account') || 'Missing'}</p>
+              <p><strong>Account Exists:</strong> {accountValidation.accountExists ? 'Yes' : 'No'}</p>
+              <p><strong>Origin Number Unique:</strong> {accountValidation.originNumberUnique ? 'Yes' : 'No'}</p>
+              <p><strong>Company ID:</strong> {accountValidation.companyId || 'N/A'}</p>
+            </div>
+            
+            <button
+              onClick={() => router.push('/')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#d97706'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#f59e0b'}
+            >
+              Return to Home
+            </button>
           </div>
         </MainContent>
       </DashboardContainer>
@@ -705,6 +896,281 @@ export default function ClientKYCPage() {
             >
               Return to Home
             </button>
+          </div>
+        </MainContent>
+      </DashboardContainer>
+    );
+  }
+
+  // Show captcha modal if required
+  if (captchaRequired) {
+    return (
+      <DashboardContainer>
+        <MainContent>
+          {/* Captcha Modal Overlay - Unexitable */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(8px)'
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
+              padding: '3rem',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              animation: `${fadeInUp} 0.5s ease-out`,
+              border: '3px solid #f59e0b'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div style={{
+                  fontSize: '4rem',
+                  marginBottom: '1rem',
+                  animation: 'pulse 2s infinite'
+                }}>
+                  🤖
+                </div>
+                <h2 style={{
+                  fontSize: '1.75rem',
+                  fontWeight: '700',
+                  margin: '0 0 0.5rem 0',
+                  color: '#0f172a',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  Human Verification Required
+                </h2>
+                <p style={{
+                  color: '#64748b',
+                  margin: 0,
+                  fontSize: '1rem',
+                  lineHeight: '1.6'
+                }}>
+                  Complete the verification below to access your KYC process
+                </p>
+              </div>
+
+              {/* Captcha Display */}
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{
+                  backgroundColor: '#fefdf8',
+                  border: '3px solid #f59e0b',
+                  borderRadius: '12px',
+                  padding: '2rem',
+                  textAlign: 'center',
+                  marginBottom: '1.5rem',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  background: 'linear-gradient(135deg, #fefdf8 0%, #fef3c7 100%)'
+                }}>
+                  <div style={{
+                    fontSize: '2.5rem',
+                    fontWeight: 'bold',
+                    letterSpacing: '0.3em',
+                    color: '#1f2937',
+                    fontFamily: 'monospace',
+                    background: 'linear-gradient(45deg, #f59e0b, #d97706)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
+                    transform: 'rotate(-1deg)',
+                    userSelect: 'none',
+                    cursor: 'pointer'
+                  }} onClick={generateNewCaptcha} title="Click to generate new captcha">
+                    {captchaText}
+                  </div>
+                  
+                  {/* Decorative elements */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '15px',
+                    left: '25px',
+                    width: '25px',
+                    height: '25px',
+                    background: '#f59e0b',
+                    borderRadius: '50%',
+                    opacity: 0.3
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '20px',
+                    right: '30px',
+                    width: '20px',
+                    height: '20px',
+                    background: '#d97706',
+                    borderRadius: '50%',
+                    opacity: 0.4
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '35px',
+                    right: '20px',
+                    width: '15px',
+                    height: '15px',
+                    background: '#fbbf24',
+                    borderRadius: '50%',
+                    opacity: 0.5
+                  }} />
+                </div>
+
+                {/* Captcha Input */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <input
+                    type="text"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    onKeyPress={handleCaptchaKeyPress}
+                    placeholder="Enter the text you see above"
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '3px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1.125rem',
+                      textAlign: 'center',
+                      letterSpacing: '0.1em',
+                      fontFamily: 'monospace',
+                      fontWeight: '600',
+                      background: '#f8fafc',
+                      transition: 'all 0.3s ease'
+                    }}
+                    autoFocus
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#f59e0b';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e2e8f0';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+
+                {/* Error Message */}
+                {captchaError && (
+                  <div style={{
+                    color: '#dc2626',
+                    fontSize: '0.875rem',
+                    textAlign: 'center',
+                    marginBottom: '1.5rem',
+                    padding: '0.75rem',
+                    background: '#fef2f2',
+                    border: '2px solid #fecaca',
+                    borderRadius: '8px',
+                    fontWeight: '500'
+                  }}>
+                    {captchaError}
+                  </div>
+                )}
+
+                {/* Attempts Counter */}
+                {captchaAttempts > 0 && (
+                  <div style={{
+                    color: '#64748b',
+                    fontSize: '0.875rem',
+                    textAlign: 'center',
+                    marginBottom: '1.5rem',
+                    fontWeight: '500'
+                  }}>
+                    Attempts: {captchaAttempts}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                  <button
+                    onClick={generateNewCaptcha}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      backgroundColor: '#f8fafc',
+                      color: '#374151',
+                      border: '2px solid #d1d5db',
+                      borderRadius: '10px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.backgroundColor = '#f1f5f9';
+                      e.target.style.borderColor = '#f59e0b';
+                      e.target.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.backgroundColor = '#f8fafc';
+                      e.target.style.borderColor = '#d1d5db';
+                      e.target.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    🔄 New Captcha
+                  </button>
+                  <button
+                    onClick={verifyCaptcha}
+                    disabled={!captchaInput.trim()}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      backgroundColor: captchaInput.trim() ? '#f59e0b' : '#d1d5db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: captchaInput.trim() ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.3s ease',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      boxShadow: captchaInput.trim() ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                    }}
+                    onMouseOver={(e) => {
+                      if (captchaInput.trim()) {
+                        e.target.style.backgroundColor = '#d97706';
+                        e.target.style.transform = 'translateY(-2px)';
+                        e.target.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.4)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (captchaInput.trim()) {
+                        e.target.style.backgroundColor = '#f59e0b';
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+                      }
+                    }}
+                  >
+                    ✓ Verify
+                  </button>
+                </div>
+              </div>
+
+              {/* Security Notice */}
+              <div style={{
+                marginTop: '2rem',
+                padding: '1.5rem',
+                backgroundColor: '#f0f9ff',
+                border: '2px solid #bae6fd',
+                borderRadius: '12px',
+                fontSize: '0.875rem',
+                color: '#0369a1',
+                textAlign: 'center',
+                fontWeight: '500'
+              }}>
+                <div style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>🔒</div>
+                <strong>Security Notice:</strong> This verification helps protect against automated attacks and ensures the security of your KYC process.
+              </div>
+            </div>
           </div>
         </MainContent>
       </DashboardContainer>
@@ -832,6 +1298,29 @@ export default function ClientKYCPage() {
                  Account: {companyInfo.account_info?.account_code} | 
                  Current Level: {companyInfo.account_info?.current_privilege_level} | 
                  Company ID: {companyInfo.company_id}
+               </div>
+             )}
+             
+             {/* Account Validation Status */}
+             {accountValidation.accountExists && (
+               <div style={{
+                 color: '#15803d',
+                 fontSize: '0.75rem',
+                 marginTop: '0.5rem',
+                 fontWeight: '500',
+                 display: 'flex',
+                 alignItems: 'center',
+                 justifyContent: 'center',
+                 gap: '0.5rem'
+               }}>
+                 <span>✓</span>
+                 <span>Account Validated</span>
+                 {accountValidation.accountOriginNumber && (
+                   <span>| Origin: {accountValidation.accountOriginNumber}</span>
+                 )}
+                 {!accountValidation.originNumberUnique && (
+                   <span style={{ color: '#d97706' }}>| ⚠️ Duplicate Origin Number</span>
+                 )}
                </div>
              )}
              {/* Enhanced gradient overlay */}

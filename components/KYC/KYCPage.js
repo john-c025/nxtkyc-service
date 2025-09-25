@@ -95,7 +95,8 @@ export default function KYCPage() {
     targetLevel: 1,
     requestDescription: '',
     generateFiles: true,
-    fileCount: 3
+    fileCount: 3,
+    accountOriginNumber: ''
   });
   const [clientFormData, setClientFormData] = useState({
     selectedCompany: '',
@@ -110,6 +111,24 @@ export default function KYCPage() {
   });
   const [isGeneratingTest, setIsGeneratingTest] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [accountOriginError, setAccountOriginError] = useState('');
+
+  // Validation function for account origin number
+  const validateAccountOriginNumber = (value) => {
+    if (!value) return ''; // Empty is allowed (will auto-generate)
+    
+    if (value.length > 100) {
+      return 'Account origin number must be 100 characters or less';
+    }
+    
+    // Check for control characters, quotes, or semicolons
+    const invalidChars = /[\x00-\x1F\x7F"'`;]/;
+    if (invalidChars.test(value)) {
+      return 'Account origin number cannot contain control characters, quotes, or semicolons';
+    }
+    
+    return '';
+  };
 
   // Mock data for KYC requests based on database schema
   const mockKycData = [
@@ -585,9 +604,16 @@ The client is now available for KYC request generation!`);
           throw new Error('Please select a valid company');
         }
 
+        // Validate account origin number
+        const originError = validateAccountOriginNumber(testFormData.accountOriginNumber);
+        if (originError) {
+          setAccountOriginError(originError);
+          throw new Error(originError);
+        }
+
         // Use the upsert endpoint as per documentation
         const upsertData = {
-          account_origin_number: `TEST-${Date.now()}`,
+          account_origin_number: testFormData.accountOriginNumber || `TEST-${Date.now()}`,
           company_id: parseInt(testFormData.selectedCompany),
           current_privilege_level: testFormData.currentLevel
         };
@@ -660,8 +686,10 @@ The CAPTCHA link is now ready for client access!`);
             targetLevel: 1,
             requestDescription: '',
             generateFiles: true,
-            fileCount: 3
+            fileCount: 3,
+            accountOriginNumber: ''
           });
+          setAccountOriginError('');
           
           setShowTestGenerator(false);
           
@@ -1434,6 +1462,36 @@ The CAPTCHA link is now ready for client access!`);
                 
                 <div className="form-row">
                   <div className="form-group">
+                    <label>Account Origin Number (Optional)</label>
+                    <input
+                      type="text"
+                      value={testFormData.accountOriginNumber}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTestFormData(prev => ({ ...prev, accountOriginNumber: value }));
+                        setAccountOriginError(validateAccountOriginNumber(value));
+                      }}
+                      placeholder="Enter unique identifier from your system (e.g., CLIENT_12345)"
+                      maxLength={100}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: `1px solid ${accountOriginError ? '#ef4444' : '#d1d5db'}`,
+                        borderRadius: '6px',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                    {accountOriginError ? (
+                      <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                        ⚠️ {accountOriginError}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                        💡 Unique identifier from your website/system. If empty, system will auto-generate one
+                      </div>
+                    )}
+                  </div>
+                  <div className="form-group">
                     <label>Request Type</label>
                     <select
                       value={testFormData.requestType}
@@ -1441,10 +1499,13 @@ The CAPTCHA link is now ready for client access!`);
                     >
                       <option value="initial_verification">Initial Verification</option>
                       <option value="level_upgrade">Level Upgrade</option>
-                      <option value="compliance_review">Compliance Review</option>
                       <option value="document_update">Document Update</option>
+                      <option value="re_verification">Re-verification</option>
                     </select>
                   </div>
+                </div>
+                
+                <div className="form-row">
                   <div className="form-group">
                     <label>Priority Level</label>
                     <select

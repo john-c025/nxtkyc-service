@@ -46,6 +46,15 @@ export default function CaptchaPage() {
   const [isLoadingAccess, setIsLoadingAccess] = useState(true);
   const [accessError, setAccessError] = useState(null);
   const [redirectUrl, setRedirectUrl] = useState(null);
+  const [accountValidation, setAccountValidation] = useState({
+    isValid: false,
+    isLoading: true,
+    error: null,
+    accountExists: false,
+    originNumberUnique: false,
+    accountOriginNumber: null,
+    companyId: 0
+  });
   const [settings, setSettings] = useState({
     difficulty: 'medium',
     length: 5,
@@ -58,6 +67,54 @@ export default function CaptchaPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
   const canvasRef = useRef(null);
+
+  // Account validation function
+  const validateAccountExistence = async (accountCode) => {
+    if (!accountCode) {
+      setAccountValidation(prev => ({
+        ...prev,
+        isLoading: false,
+        error: 'Account code is required',
+        isValid: false
+      }));
+      return false;
+    }
+
+    try {
+      console.log('🔍 CaptchaPage: Checking account existence for:', accountCode);
+      const response = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_CHECK_ACCOUNT, {
+        params: { account_code: accountCode }
+      });
+
+      if (response.data.success) {
+        const data = response.data.data;
+        console.log('✅ CaptchaPage: Account validation response:', data);
+        
+        setAccountValidation({
+          isValid: data.account_exists,
+          isLoading: false,
+          error: null,
+          accountExists: data.account_exists,
+          originNumberUnique: data.origin_number_unique,
+          accountOriginNumber: data.account_origin_number,
+          companyId: data.company_id
+        });
+
+        return data.account_exists;
+      } else {
+        throw new Error(response.data.message || 'Account validation failed');
+      }
+    } catch (error) {
+      console.error('❌ CaptchaPage: Account validation error:', error);
+      setAccountValidation(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Failed to validate account',
+        isValid: false
+      }));
+      return false;
+    }
+  };
 
   // Generate random captcha text
   const generateCaptchaText = () => {
@@ -332,6 +389,15 @@ export default function CaptchaPage() {
         // Validate access - require token and account parameters
         if (token && account) {
           console.log('CaptchaPage: Valid access with token and account parameters');
+          
+          // Validate account existence first
+          console.log('🔍 CaptchaPage: Validating account existence...');
+          const accountExists = await validateAccountExistence(account);
+          if (!accountExists) {
+            setAccessError('Account not found or invalid. Please check your account code.');
+            return;
+          }
+          
           setIsValidAccess(true);
           await generateNewCaptcha();
         } else if (redirect || source) {
@@ -389,8 +455,8 @@ export default function CaptchaPage() {
 
   const recentVerifications = captchaHistory.slice(0, 10);
 
-  // Show loading state while validating access
-  if (isLoadingAccess) {
+  // Show loading state while validating access and account
+  if (isLoadingAccess || accountValidation.isLoading) {
     return (
       <DashboardContainer>
         <MainContent>
@@ -411,8 +477,16 @@ export default function CaptchaPage() {
               animation: 'spin 1s linear infinite'
             }} />
             <p style={{ color: '#64748b', fontSize: '1.125rem' }}>
-              Validating access...
+              {accountValidation.isLoading ? 'Validating account...' : 'Validating access...'}
             </p>
+            <div style={{ 
+              fontSize: '0.875rem', 
+              color: '#64748b',
+              textAlign: 'center',
+              marginTop: '1rem'
+            }}>
+              <p>Account: {searchParams.get('account') || 'Missing'}</p>
+            </div>
           </div>
         </MainContent>
       </DashboardContainer>
@@ -494,6 +568,27 @@ export default function CaptchaPage() {
             <HeaderTitle>
               <h1>Prove you're a human</h1>
               <p>Advanced bot protection and human verification system</p>
+              {/* Account Validation Status */}
+              {accountValidation.accountExists && (
+                <div style={{
+                  color: '#15803d',
+                  fontSize: '0.75rem',
+                  marginTop: '0.5rem',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span>✓</span>
+                  <span>Account Validated</span>
+                  {accountValidation.accountOriginNumber && (
+                    <span>| Origin: {accountValidation.accountOriginNumber}</span>
+                  )}
+                  {!accountValidation.originNumberUnique && (
+                    <span style={{ color: '#d97706' }}>| ⚠️ Duplicate Origin Number</span>
+                  )}
+                </div>
+              )}
             </HeaderTitle>
           </HeaderContent>
           <HeaderActions>

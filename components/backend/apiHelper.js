@@ -146,6 +146,7 @@ export const API_ENDPOINTS = {
   // Public KYC Extended Operations
   KYC_PUBLIC_GET_COMPANY_INFO: `${API_BASE_URL}/public/kyc/company`, // /{companyId}
   KYC_PUBLIC_GET_COMPANY_BY_ACCOUNT: `${API_BASE_URL}/public/kyc/company-by-account`, // ?account_code={accountCode}
+  KYC_PUBLIC_CHECK_ACCOUNT: `${API_BASE_URL}/public/kyc/check-account`, // ?account_code={accountCode}
   KYC_PUBLIC_UPLOAD_ADDITIONAL_FILES: `${API_BASE_URL}/public/kyc/upload-additional`, // /{kycRequestId}
   KYC_PUBLIC_WITHDRAW_REQUEST: `${API_BASE_URL}/public/kyc/withdraw`, // /{kycRequestId}
   KYC_PUBLIC_RESUBMIT_REQUEST: `${API_BASE_URL}/public/kyc/resubmit`, // /{kycRequestId}
