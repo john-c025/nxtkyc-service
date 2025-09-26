@@ -184,6 +184,111 @@ export default function ClientKYCPage() {
     }
   }, [captchaRequired]);
 
+  // Security measures to prevent bypassing captcha
+  useEffect(() => {
+    if (captchaRequired) {
+      // Prevent right-click context menu
+      const preventContextMenu = (e) => e.preventDefault();
+      
+      // Prevent F12, Ctrl+Shift+I, Ctrl+U, etc.
+      const preventDevTools = (e) => {
+        if (
+          e.key === 'F12' ||
+          (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+          (e.ctrlKey && e.shiftKey && e.key === 'C') ||
+          (e.ctrlKey && e.shiftKey && e.key === 'J') ||
+          (e.ctrlKey && e.key === 'U') ||
+          (e.ctrlKey && e.key === 'S') ||
+          (e.ctrlKey && e.key === 'A') ||
+          (e.ctrlKey && e.key === 'P')
+        ) {
+          e.preventDefault();
+          return false;
+        }
+      };
+
+      // Prevent text selection
+      const preventSelection = (e) => e.preventDefault();
+
+      // Add event listeners
+      document.addEventListener('contextmenu', preventContextMenu);
+      document.addEventListener('keydown', preventDevTools);
+      document.addEventListener('selectstart', preventSelection);
+      document.addEventListener('dragstart', preventSelection);
+
+      // Disable common dev tools shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key))) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+
+      // Prevent console access
+      const originalConsole = window.console;
+      window.console = {
+        ...originalConsole,
+        log: () => {},
+        warn: () => {},
+        error: () => {},
+        info: () => {},
+        debug: () => {},
+        trace: () => {},
+        dir: () => {},
+        group: () => {},
+        groupEnd: () => {},
+        time: () => {},
+        timeEnd: () => {},
+        count: () => {},
+        clear: () => {}
+      };
+
+      // Detect if modal is being tampered with
+      const checkModalIntegrity = () => {
+        const modal = document.querySelector('[data-captcha-modal]');
+        if (!modal || modal.style.display === 'none' || modal.style.visibility === 'hidden') {
+          // Modal was removed or hidden, regenerate captcha and show warning
+          generateNewCaptcha();
+          setCaptchaError('Security violation detected. Please complete the captcha again.');
+          setCaptchaAttempts(prev => prev + 1);
+        }
+      };
+
+      // Check modal integrity every 100ms
+      const integrityCheck = setInterval(checkModalIntegrity, 100);
+
+      // Detect if dev tools are opened
+      let devtools = { open: false, orientation: null };
+      const threshold = 160;
+      setInterval(() => {
+        if (window.outerHeight - window.innerHeight > threshold || 
+            window.outerWidth - window.innerWidth > threshold) {
+          if (!devtools.open) {
+            devtools.open = true;
+            // Dev tools opened, regenerate captcha
+            generateNewCaptcha();
+            setCaptchaError('Developer tools detected. Please complete the captcha again.');
+            setCaptchaAttempts(prev => prev + 1);
+          }
+        } else {
+          devtools.open = false;
+        }
+      }, 500);
+
+      // Cleanup function
+      return () => {
+        document.removeEventListener('contextmenu', preventContextMenu);
+        document.removeEventListener('keydown', preventDevTools);
+        document.removeEventListener('selectstart', preventSelection);
+        document.removeEventListener('dragstart', preventSelection);
+        window.console = originalConsole;
+        clearInterval(integrityCheck);
+      };
+    }
+  }, [captchaRequired]);
+
   // Account validation function
   const validateAccountExistence = async (accountCode) => {
     if (!accountCode) {
@@ -908,31 +1013,62 @@ export default function ClientKYCPage() {
       <DashboardContainer>
         <MainContent>
           {/* Captcha Modal Overlay - Unexitable */}
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            backdropFilter: 'blur(8px)'
-          }}>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '20px',
-              padding: '3rem',
-              maxWidth: '500px',
-              width: '90%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-              animation: `${fadeInUp} 0.5s ease-out`,
-              border: '3px solid #f59e0b'
-            }}>
+          <div 
+            data-captcha-modal="true"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              backdropFilter: 'blur(8px)',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              MozUserSelect: 'none',
+              msUserSelect: 'none'
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+            onSelectStart={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if (e.key === 'F12' || 
+                  (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+                  (e.ctrlKey && e.key === 'U')) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+              }
+            }}
+          >
+            <div 
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '20px',
+                padding: '3rem',
+                maxWidth: '500px',
+                width: '90%',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                animation: `${fadeInUp} 0.5s ease-out`,
+                border: '3px solid #f59e0b',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
+                msUserSelect: 'none',
+                position: 'relative'
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              onDragStart={(e) => e.preventDefault()}
+              onSelectStart={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                 <div style={{
                   fontSize: '4rem',
