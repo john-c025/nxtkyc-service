@@ -506,6 +506,181 @@ export default function KYCPage() {
     }
   };
 
+  // New API functions for enhanced functionality
+  const getRequestDetails = async (kycRequestId) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_REQUEST_DETAILS}/${kycRequestId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading request details:', error);
+      throw error;
+    }
+  };
+
+  const getRequestFiles = async (kycRequestId) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_REQUEST_FILES}/${kycRequestId}/files`);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading request files:', error);
+      throw error;
+    }
+  };
+
+  const downloadFile = async (fileId) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_DOWNLOAD_FILE}/${fileId}/download`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      throw error;
+    }
+  };
+
+  const reclassifyFile = async (fileId, categoryId) => {
+    try {
+      const response = await axiosInstance.post(`${API_ENDPOINTS.KYC_RECLASSIFY_FILE}/${fileId}/reclassify`, {
+        category_id: categoryId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error reclassifying file:', error);
+      throw error;
+    }
+  };
+
+  const invalidateFile = async (fileId, reasonCode, remarks = '') => {
+    try {
+      const response = await axiosInstance.post(`${API_ENDPOINTS.KYC_INVALIDATE_FILE}/${fileId}/invalidate`, {
+        reason_code: reasonCode,
+        remarks: remarks
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error invalidating file:', error);
+      throw error;
+    }
+  };
+
+  const requestReupload = async (fileId, reasonCode, remarks = '') => {
+    try {
+      const response = await axiosInstance.post(`${API_ENDPOINTS.KYC_REQUEST_REUPLOAD}/${fileId}/request-reupload`, {
+        reason_code: reasonCode,
+        remarks: remarks
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error requesting reupload:', error);
+      throw error;
+    }
+  };
+
+  const addRequestNote = async (kycRequestId, body, visibility = 'internal') => {
+    try {
+      const response = await axiosInstance.post(`${API_ENDPOINTS.KYC_ADD_REQUEST_NOTE}/${kycRequestId}/notes`, {
+        body: body,
+        visibility: visibility
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding request note:', error);
+      throw error;
+    }
+  };
+
+  const getRequestNotes = async (kycRequestId) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_REQUEST_NOTES}/${kycRequestId}/notes`);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading request notes:', error);
+      throw error;
+    }
+  };
+
+  const changeRequestStatus = async (kycRequestId, action, reasonCode = '', remarks = '') => {
+    try {
+      const response = await axiosInstance.post(`${API_ENDPOINTS.KYC_CHANGE_REQUEST_STATUS}/${kycRequestId}/status`, {
+        action: action,
+        reason_code: reasonCode,
+        remarks: remarks
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error changing request status:', error);
+      throw error;
+    }
+  };
+
+  const bulkProcessRequests = async (requestIds, action, reasonCode = '', remarks = '') => {
+    try {
+      const response = await axiosInstance.post(API_ENDPOINTS.KYC_BULK_ACTIONS, {
+        ids: requestIds,
+        action: action,
+        reason_code: reasonCode,
+        remarks: remarks
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error bulk processing requests:', error);
+      throw error;
+    }
+  };
+
+  const sendDecisionEmail = async (kycRequestId, decision, decisionReason, subject, body) => {
+    try {
+      const response = await axiosInstance.post(`${API_ENDPOINTS.KYC_SEND_DECISION_EMAIL}/${kycRequestId}/send-decision-email`, {
+        decision: decision,
+        decision_reason: decisionReason,
+        subject: subject,
+        body: body
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending decision email:', error);
+      throw error;
+    }
+  };
+
+  const getAuditTrail = async (kycRequestId) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_AUDIT_TRAIL}/${kycRequestId}/audit`);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading audit trail:', error);
+      throw error;
+    }
+  };
+
+  const getTokenLogs = async (accountCode) => {
+    try {
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_GET_TOKEN_LOGS}/${accountCode}/tokens/logs`);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading token logs:', error);
+      throw error;
+    }
+  };
+
+  const exportRequests = async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      Object.keys(filters).forEach(key => {
+        if (filters[key]) params.append(key, filters[key]);
+      });
+      
+      const response = await axiosInstance.get(`${API_ENDPOINTS.KYC_EXPORT_REQUESTS}?${params}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error exporting requests:', error);
+      throw error;
+    }
+  };
+
   // Test Client Creation Function
   const createTestClient = async () => {
     try {

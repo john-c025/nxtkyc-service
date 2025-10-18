@@ -36,61 +36,98 @@ export const API_ENDPOINTS = {
   
   // KYC System Endpoints (Following Official Documentation)
   
-  // Internal API Endpoints (/KYC/*)
+  // Internal API Endpoints (/kyc/*)
   // Company Management
-  KYC_GET_COMPANIES: `${API_BASE_URL}/KYC/companies`,
-  KYC_GET_COMPANY_BY_ID: `${API_BASE_URL}/KYC/companies`, // /{companyId}
-  KYC_CREATE_COMPANY: `${API_BASE_URL}/KYC/companies`,
+  KYC_GET_COMPANIES: `${API_BASE_URL}/kyc/companies`,
+  KYC_GET_COMPANY_BY_ID: `${API_BASE_URL}/kyc/companies`, // /{companyId}
+  KYC_CREATE_COMPANY: `${API_BASE_URL}/kyc/companies`,
+  KYC_UPDATE_COMPANY: `${API_BASE_URL}/kyc/companies`, // /{companyId}
+  KYC_DELETE_COMPANY: `${API_BASE_URL}/kyc/companies`, // /{companyId}
 
   // Client Account Management
-  KYC_GET_CLIENT_ACCOUNTS: `${API_BASE_URL}/KYC/clients`,
-  KYC_GET_CLIENT_BY_ACCOUNT_CODE: `${API_BASE_URL}/KYC/clients`, // /{accountCode}
-  KYC_CREATE_CLIENT_ACCOUNT: `${API_BASE_URL}/KYC/clients`,
-  KYC_UPSERT_CLIENT_ACCOUNT: `${API_BASE_URL}/KYC/clients/create`,
-  KYC_UPDATE_CLIENT_ACCOUNT: `${API_BASE_URL}/KYC/clients`, // /{accountId}
+  KYC_GET_CLIENT_ACCOUNTS: `${API_BASE_URL}/kyc/clients`,
+  KYC_GET_CLIENT_BY_ACCOUNT_CODE: `${API_BASE_URL}/kyc/clients`, // /{accountCode}
+  KYC_CREATE_CLIENT_ACCOUNT: `${API_BASE_URL}/kyc/clients`,
+  KYC_UPSERT_CLIENT_ACCOUNT: `${API_BASE_URL}/kyc/clients/create`,
+  KYC_UPDATE_CLIENT_ACCOUNT: `${API_BASE_URL}/kyc/clients`, // /{accountId}
+  KYC_SEARCH_CLIENTS: `${API_BASE_URL}/kyc/clients/search`,
+  KYC_MERGE_CLIENTS: `${API_BASE_URL}/kyc/clients/merge`,
 
   // Access Token Management
-  KYC_GENERATE_ACCESS_TOKEN: `${API_BASE_URL}/KYC/tokens/generate`,
+  KYC_GENERATE_ACCESS_TOKEN: `${API_BASE_URL}/kyc/tokens/generate`,
+  KYC_VALIDATE_TOKEN: `${API_BASE_URL}/kyc/tokens/validate`,
+  KYC_REVOKE_TOKEN: `${API_BASE_URL}/kyc/tokens/revoke`,
 
   // KYC Request Management (Internal)
-  KYC_GET_REQUESTS: `${API_BASE_URL}/KYC/requests`,
-  KYC_GET_REQUEST_DETAILS: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}
-  KYC_CREATE_REQUEST: `${API_BASE_URL}/KYC/requests`,
-  KYC_PROCESS_REQUEST: `${API_BASE_URL}/KYC/requests/process`,
+  KYC_GET_REQUESTS: `${API_BASE_URL}/kyc/requests`,
+  KYC_GET_REQUEST_DETAILS: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}
+  KYC_CREATE_REQUEST: `${API_BASE_URL}/kyc/requests`,
+  KYC_PROCESS_REQUEST: `${API_BASE_URL}/kyc/requests/process`,
+  KYC_GET_REQUEST_NOTES: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/notes
+  KYC_ADD_REQUEST_NOTE: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/notes
+  KYC_CHANGE_REQUEST_STATUS: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/status
+  KYC_BULK_ACTIONS: `${API_BASE_URL}/kyc/requests/bulk`,
 
-  // File Management
-  KYC_GET_REQUEST_FILES: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/files
-  KYC_UPLOAD_REQUEST_FILES: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/files
+  // File Management (Admin)
+  KYC_GET_REQUEST_FILES: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/files
+  KYC_UPLOAD_REQUEST_FILES: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/files
+  KYC_DOWNLOAD_FILE: `${API_BASE_URL}/kyc/files`, // /{fileId}/download
+  KYC_RECLASSIFY_FILE: `${API_BASE_URL}/kyc/files`, // /{fileId}/reclassify
+  KYC_INVALIDATE_FILE: `${API_BASE_URL}/kyc/files`, // /{fileId}/invalidate
+  KYC_REQUEST_REUPLOAD: `${API_BASE_URL}/kyc/files`, // /{fileId}/request-reupload
 
   // Dashboard & Analytics
-  KYC_DASHBOARD_SUMMARY: `${API_BASE_URL}/KYC/dashboard/summary`,
-  KYC_COMPANY_STATISTICS: `${API_BASE_URL}/KYC/dashboard/company-statistics`,
+  KYC_DASHBOARD_SUMMARY: `${API_BASE_URL}/kyc/dashboard/summary`,
+  KYC_COMPANY_STATISTICS: `${API_BASE_URL}/kyc/dashboard/company-statistics`,
+  KYC_EXPORT_REQUESTS: `${API_BASE_URL}/kyc/requests/export.csv`,
 
   // Reference Data
-  KYC_STATUS_REFERENCE: `${API_BASE_URL}/KYC/reference/statuses`,
+  KYC_STATUS_REFERENCE: `${API_BASE_URL}/kyc/reference/statuses`,
 
-  // KYC Privileges Management (Missing from documentation but needed)
-  KYC_GET_PRIVILEGES: `${API_BASE_URL}/KYC/privileges`,
-  KYC_GET_PRIVILEGE_DETAILS: `${API_BASE_URL}/KYC/privileges`, // /{privilegeId}
-  KYC_CREATE_PRIVILEGE: `${API_BASE_URL}/KYC/privileges`,
-  KYC_UPDATE_PRIVILEGE: `${API_BASE_URL}/KYC/privileges`, // /{privilegeId}
-  KYC_DELETE_PRIVILEGE: `${API_BASE_URL}/KYC/privileges`, // /{privilegeId}
-  
+  // KYC Privileges Management (CRUD)
+  KYC_GET_PRIVILEGES: `${API_BASE_URL}/kyc/privileges`,
+  KYC_GET_PRIVILEGE_DETAILS: `${API_BASE_URL}/kyc/privileges`, // /{privilegeId}
+  KYC_CREATE_PRIVILEGE: `${API_BASE_URL}/kyc/privileges`,
+  KYC_UPDATE_PRIVILEGE: `${API_BASE_URL}/kyc/privileges`, // /{privilegeId}
+  KYC_DELETE_PRIVILEGE: `${API_BASE_URL}/kyc/privileges`, // /{privilegeId}
 
-  // System User Management for KYC (Missing but referenced in documentation)
-  KYC_GET_SYSTEM_USERS: `${API_BASE_URL}/KYC/users`,
-  KYC_GET_USER_COMPANY_ACCESS: `${API_BASE_URL}/KYC/users`, // /{userId}/companies
-  KYC_UPDATE_USER_COMPANY_ACCESS: `${API_BASE_URL}/KYC/users`, // /{userId}/companies
+  // File Categories Management (CRUD)
+  KYC_GET_FILE_CATEGORIES: `${API_BASE_URL}/kyc/files/categories`,
+  KYC_CREATE_FILE_CATEGORY: `${API_BASE_URL}/kyc/files/categories`,
+  KYC_UPDATE_FILE_CATEGORY: `${API_BASE_URL}/kyc/files/categories`, // /{id}
+  KYC_DELETE_FILE_CATEGORY: `${API_BASE_URL}/kyc/files/categories`, // /{id}
 
-  // Token Management (Additional endpoints)
-  KYC_VALIDATE_TOKEN: `${API_BASE_URL}/public/kyc/tokens/validate`,
-  KYC_REVOKE_TOKEN: `${API_BASE_URL}/KYC/tokens/revoke`,
+  // System User Management for KYC
+  KYC_GET_SYSTEM_USERS: `${API_BASE_URL}/kyc/users`,
+  KYC_GET_USER_COMPANY_ACCESS: `${API_BASE_URL}/kyc/users`, // /{userId}/companies
+  KYC_UPDATE_USER_COMPANY_ACCESS: `${API_BASE_URL}/kyc/users`, // /{userId}/companies
 
-  // Audit Trail (Missing from current implementation)
-  KYC_GET_AUDIT_TRAIL: `${API_BASE_URL}/KYC/audit/trail`, // /{kycRequestId}
-  KYC_GET_APPROVAL_ACTIONS: `${API_BASE_URL}/KYC/audit/actions`, // /{kycRequestId}
+  // Audit Trail & Security
+  KYC_GET_AUDIT_TRAIL: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/audit
+  KYC_GET_TOKEN_LOGS: `${API_BASE_URL}/kyc/accounts`, // /{account_code}/tokens/logs
+
+  // Notifications
+  KYC_SEND_DECISION_EMAIL: `${API_BASE_URL}/kyc/requests`, // /{kycRequestId}/send-decision-email
 
   // Public API Endpoints (/public/kyc/*)
+  // Token Lifecycle (Public)
+  KYC_PUBLIC_REVOKE_TOKEN: `${API_BASE_URL}/public/kyc/tokens/revoke`,
+  KYC_PUBLIC_INTROSPECT_TOKEN: `${API_BASE_URL}/public/kyc/tokens/introspect`,
+  KYC_PUBLIC_SEND_EMAIL: `${API_BASE_URL}/public/kyc/tokens/send-email`,
+  KYC_PUBLIC_RESEND_EMAIL: `${API_BASE_URL}/public/kyc/tokens/resend`,
+
+  // Request Status (Public)
+  KYC_PUBLIC_REQUEST_STATUS: `${API_BASE_URL}/public/kyc/requests/status`,
+  KYC_PUBLIC_REQUEST_TIMELINE: `${API_BASE_URL}/public/kyc/requests`, // /{kycRequestId}/timeline
+
+  // File Uploads (Public)
+  KYC_PUBLIC_CREATE_UPLOAD_SESSION: `${API_BASE_URL}/public/kyc/upload/create-session`,
+  KYC_PUBLIC_COMPLETE_UPLOAD_SESSION: `${API_BASE_URL}/public/kyc/upload/complete-session`,
+  KYC_PUBLIC_UPLOAD_SCAN_STATUS: `${API_BASE_URL}/public/kyc/upload`, // /{upload_session_id}/scan-status
+
+  // Public Config
+  KYC_PUBLIC_CONFIG: `${API_BASE_URL}/public/kyc/config`,
+
   // Client KYC Submission
   KYC_PUBLIC_SUBMIT: `${API_BASE_URL}/public/kyc/submit`,
   KYC_PUBLIC_CHECK_STATUS: `${API_BASE_URL}/public/kyc/status`, // /{kycRequestId}
@@ -98,58 +135,17 @@ export const API_ENDPOINTS = {
   // Information Endpoints
   KYC_PUBLIC_PRIVILEGE_LEVELS: `${API_BASE_URL}/public/kyc/privilege-levels`, // /{companyId}
   KYC_PUBLIC_REQUIREMENTS: `${API_BASE_URL}/public/kyc/requirements`,
+  KYC_PUBLIC_GET_COMPANY_BY_ACCOUNT: `${API_BASE_URL}/public/kyc/company-by-account`,
+  KYC_PUBLIC_CHECK_ACCOUNT: `${API_BASE_URL}/public/kyc/check-account`,
+  KYC_PUBLIC_GET_PUBLIC_FILE_CATEGORIES: `${API_BASE_URL}/public/kyc/files/categories`,
   
-  // Captcha System Endpoints
+  // Captcha System Endpoints (Legacy - integrated into ClientKYCPage)
   GENERATE_CAPTCHA: `${API_BASE_URL}/captcha/generate`,
   VERIFY_CAPTCHA: `${API_BASE_URL}/captcha/verify`,
   REFRESH_CAPTCHA: `${API_BASE_URL}/captcha/refresh`,
   CAPTCHA_STATISTICS: `${API_BASE_URL}/captcha/statistics`,
   CAPTCHA_HISTORY: `${API_BASE_URL}/captcha/history`,
   CAPTCHA_SETTINGS: `${API_BASE_URL}/captcha/settings`,
-
-  // Additional KYC File Management (Comprehensive)
-  KYC_DOWNLOAD_FILE: `${API_BASE_URL}/KYC/files/download`, // /{fileId}
-  KYC_DELETE_FILE: `${API_BASE_URL}/KYC/files/delete`, // /{fileId}
-  KYC_GET_FILE_INFO: `${API_BASE_URL}/KYC/files/info`, // /{fileId}
-  KYC_UPDATE_FILE_DESCRIPTION: `${API_BASE_URL}/KYC/files/description`, // /{fileId}
-  KYC_GET_FILE_CATEGORIES: `${API_BASE_URL}/KYC/files/categories`,
-  KYC_GET_PUBLIC_FILE_CATEGORIES: `${API_BASE_URL}/public/kyc/files/categories`,
-
-
-  // KYC Request Status Management
-  KYC_GET_STATUS_HISTORY: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/status-history
-  KYC_UPDATE_REQUEST_PRIORITY: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/priority
-  KYC_ASSIGN_REVIEWER: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/assign
-  KYC_ADD_REQUEST_COMMENT: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/comments
-  KYC_GET_REQUEST_COMMENTS: `${API_BASE_URL}/KYC/requests`, // /{kycRequestId}/comments
-
-  // KYC Bulk Operations
-  KYC_BULK_APPROVE: `${API_BASE_URL}/KYC/requests/bulk/approve`,
-  KYC_BULK_REJECT: `${API_BASE_URL}/KYC/requests/bulk/reject`,
-  KYC_BULK_ARCHIVE: `${API_BASE_URL}/KYC/requests/bulk/archive`,
-  KYC_BULK_ASSIGN: `${API_BASE_URL}/KYC/requests/bulk/assign`,
-
-  // KYC Reporting & Analytics (Extended)
-  KYC_EXPORT_REQUESTS: `${API_BASE_URL}/KYC/reports/export`,
-  KYC_GENERATE_REPORT: `${API_BASE_URL}/KYC/reports/generate`,
-  KYC_GET_PERFORMANCE_METRICS: `${API_BASE_URL}/KYC/analytics/performance`,
-  KYC_GET_PROCESSING_TIMES: `${API_BASE_URL}/KYC/analytics/processing-times`,
-  KYC_GET_APPROVAL_RATES: `${API_BASE_URL}/KYC/analytics/approval-rates`,
-
-  // KYC Configuration & Settings
-  KYC_GET_SYSTEM_SETTINGS: `${API_BASE_URL}/KYC/settings/system`,
-  KYC_UPDATE_SYSTEM_SETTINGS: `${API_BASE_URL}/KYC/settings/system`,
-  KYC_GET_EMAIL_TEMPLATES: `${API_BASE_URL}/KYC/settings/email-templates`,
-  KYC_UPDATE_EMAIL_TEMPLATE: `${API_BASE_URL}/KYC/settings/email-templates`, // /{templateId}
-  KYC_GET_NOTIFICATION_SETTINGS: `${API_BASE_URL}/KYC/settings/notifications`,
-
-  // Public KYC Extended Operations
-  KYC_PUBLIC_GET_COMPANY_INFO: `${API_BASE_URL}/public/kyc/company`, // /{companyId}
-  KYC_PUBLIC_GET_COMPANY_BY_ACCOUNT: `${API_BASE_URL}/public/kyc/company-by-account`, // ?account_code={accountCode}
-  KYC_PUBLIC_CHECK_ACCOUNT: `${API_BASE_URL}/public/kyc/check-account`, // ?account_code={accountCode}
-  KYC_PUBLIC_UPLOAD_ADDITIONAL_FILES: `${API_BASE_URL}/public/kyc/upload-additional`, // /{kycRequestId}
-  KYC_PUBLIC_WITHDRAW_REQUEST: `${API_BASE_URL}/public/kyc/withdraw`, // /{kycRequestId}
-  KYC_PUBLIC_RESUBMIT_REQUEST: `${API_BASE_URL}/public/kyc/resubmit`, // /{kycRequestId}
   
   // Employee Masterfile (formerly Masterlist)
   LOAD_EMPLOYEE_MASTERFILE: `${API_BASE_URL}/reports/load-employee-masterfile`,

@@ -803,6 +803,133 @@ export default function ClientKYCPage() {
     }
   };
 
+  // New public API functions for enhanced functionality
+  const revokeToken = async () => {
+    try {
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.KYC_PUBLIC_REVOKE_TOKEN, {
+        token: accessToken,
+        account_code: accountCode
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error revoking token:', error);
+      throw error;
+    }
+  };
+
+  const introspectToken = async () => {
+    try {
+      const response = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_INTROSPECT_TOKEN, {
+        params: {
+          token: accessToken,
+          account_code: accountCode
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error introspecting token:', error);
+      throw error;
+    }
+  };
+
+  const sendKYCEmail = async (email, hoursValid = 24) => {
+    try {
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.KYC_PUBLIC_SEND_EMAIL, {
+        email: email,
+        account_code: accountCode,
+        hours_valid: hoursValid
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending KYC email:', error);
+      throw error;
+    }
+  };
+
+  const resendKYCEmail = async () => {
+    try {
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.KYC_PUBLIC_RESEND_EMAIL, {
+        account_code: accountCode
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error resending KYC email:', error);
+      throw error;
+    }
+  };
+
+  const getRequestStatus = async (kycRequestId) => {
+    try {
+      const response = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_REQUEST_STATUS, {
+        params: {
+          kyc_request_id: kycRequestId
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting request status:', error);
+      throw error;
+    }
+  };
+
+  const getRequestTimeline = async (kycRequestId) => {
+    try {
+      const response = await axiosPublicInstance.get(`${API_ENDPOINTS.KYC_PUBLIC_REQUEST_TIMELINE}/${kycRequestId}/timeline`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting request timeline:', error);
+      throw error;
+    }
+  };
+
+  const createUploadSession = async (files) => {
+    try {
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.KYC_PUBLIC_CREATE_UPLOAD_SESSION, {
+        token: accessToken,
+        account_code: accountCode,
+        files: files
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating upload session:', error);
+      throw error;
+    }
+  };
+
+  const completeUploadSession = async (uploadSessionId) => {
+    try {
+      const response = await axiosPublicInstance.post(API_ENDPOINTS.KYC_PUBLIC_COMPLETE_UPLOAD_SESSION, {
+        token: accessToken,
+        account_code: accountCode,
+        upload_session_id: uploadSessionId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error completing upload session:', error);
+      throw error;
+    }
+  };
+
+  const getUploadScanStatus = async (uploadSessionId) => {
+    try {
+      const response = await axiosPublicInstance.get(`${API_ENDPOINTS.KYC_PUBLIC_UPLOAD_SCAN_STATUS}/${uploadSessionId}/scan-status`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting upload scan status:', error);
+      throw error;
+    }
+  };
+
+  const getPublicConfig = async () => {
+    try {
+      const response = await axiosPublicInstance.get(API_ENDPOINTS.KYC_PUBLIC_CONFIG);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting public config:', error);
+      throw error;
+    }
+  };
+
   const getStepStatus = (stepNumber) => {
     if (completedSteps.includes(stepNumber)) return 'completed';
     if (stepNumber === currentStep) return 'current';
